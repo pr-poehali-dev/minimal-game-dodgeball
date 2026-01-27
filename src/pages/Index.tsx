@@ -26,6 +26,8 @@ type Player = {
   hasAura: boolean;
   auraPhase: number;
   invulnerableUntil?: number;
+  nickname: string;
+  avatar: string;
 };
 
 type Ball = {
@@ -68,6 +70,16 @@ const GRAVITY = 0.5;
 const RESPAWN_TIME = 5000;
 const BALL_PICKUP_RADIUS = 30;
 
+const BOT_NAMES = [
+  'Shadow', 'Blaze', 'Nova', 'Pixel', 'Echo', 'Storm', 'Zen', 'Flash',
+  'Nexus', 'Volt', 'Cyber', 'Neon', 'Frost', 'Viper', 'Ghost', 'Sparks'
+];
+
+const AVATAR_COLORS = [
+  '#5865f2', '#3ba55d', '#ed4245', '#faa61a', '#9b87f5', '#0EA5E9',
+  '#f26522', '#7289da', '#43b581', '#f04747', '#faa81a', '#00d9ff'
+];
+
 export default function Index() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [gameState, setGameState] = useState<GameState>('menu');
@@ -75,6 +87,9 @@ export default function Index() {
   const [teamSize, setTeamSize] = useState(5);
   const [score, setScore] = useState({ purple: 5, blue: 5 });
   const [mousePosition, setMousePosition] = useState<Vector2D>({ x: 0, y: 0 });
+  const [playerNickname, setPlayerNickname] = useState('Player');
+  const [playerAvatar, setPlayerAvatar] = useState(AVATAR_COLORS[0]);
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
   
   const playersRef = useRef<Player[]>([]);
   const ballsRef = useRef<Ball[]>([]);
@@ -127,6 +142,8 @@ export default function Index() {
           hasAura: false,
           auraPhase: 0,
           invulnerableUntil: undefined,
+          nickname: isPlayerControlled ? playerNickname : BOT_NAMES[Math.floor(Math.random() * BOT_NAMES.length)],
+          avatar: isPlayerControlled ? playerAvatar : AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)],
         };
         newPlayers.push(player);
 
@@ -151,7 +168,7 @@ export default function Index() {
     setScore({ purple: size, blue: size });
     setCountdown(null);
     setGameState('playing');
-  }, []);
+  }, [playerNickname, playerAvatar]);
 
   const createParticles = (x: number, y: number, color: string, count: number) => {
     const particles = particlesRef.current;
@@ -733,6 +750,26 @@ export default function Index() {
         }
 
         ctx.restore();
+
+        ctx.save();
+        ctx.font = '11px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        
+        const nameY = player.position.y - player.radius - 8;
+        
+        ctx.fillStyle = 'rgba(30, 31, 34, 0.8)';
+        ctx.fillRect(
+          player.position.x - 30,
+          nameY - 14,
+          60,
+          16
+        );
+        
+        ctx.fillStyle = '#dbdee1';
+        ctx.fillText(player.nickname, player.position.x, nameY);
+        
+        ctx.restore();
       });
 
       balls.forEach((ball) => {
@@ -824,7 +861,59 @@ export default function Index() {
 
   if (gameState === 'menu') {
     return (
-      <div className="w-screen h-screen flex items-center justify-center bg-[#2b2d31]">
+      <div className="w-screen h-screen flex items-center justify-center bg-[#2b2d31] relative">
+        <div className="absolute top-6 right-6">
+          {isEditingProfile ? (
+            <div className="bg-[#1e1f22] rounded-lg p-4 shadow-xl w-64">
+              <div className="mb-3">
+                <label className="text-xs font-semibold text-[#b5bac1] uppercase tracking-wide mb-2 block">Nickname</label>
+                <input
+                  type="text"
+                  value={playerNickname}
+                  onChange={(e) => setPlayerNickname(e.target.value.slice(0, 12))}
+                  className="w-full bg-[#2b2d31] text-white px-3 py-2 rounded-md text-sm border border-[#40444b] focus:border-[#5865f2] outline-none"
+                  maxLength={12}
+                />
+              </div>
+              <div className="mb-4">
+                <label className="text-xs font-semibold text-[#b5bac1] uppercase tracking-wide mb-2 block">Avatar Color</label>
+                <div className="grid grid-cols-6 gap-2">
+                  {AVATAR_COLORS.map(color => (
+                    <button
+                      key={color}
+                      onClick={() => setPlayerAvatar(color)}
+                      className={`w-8 h-8 rounded-full transition-all ${
+                        playerAvatar === color ? 'ring-2 ring-white ring-offset-2 ring-offset-[#1e1f22]' : 'hover:scale-110'
+                      }`}
+                      style={{ backgroundColor: color }}
+                    />
+                  ))}
+                </div>
+              </div>
+              <Button
+                size="sm"
+                className="w-full bg-[#5865f2] hover:bg-[#4752c4] text-white font-semibold h-9 rounded-md"
+                onClick={() => setIsEditingProfile(false)}
+              >
+                Done
+              </Button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setIsEditingProfile(true)}
+              className="flex items-center gap-3 bg-[#1e1f22] hover:bg-[#2b2d31] rounded-lg p-3 transition-colors"
+            >
+              <div
+                className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm"
+                style={{ backgroundColor: playerAvatar }}
+              >
+                {playerNickname.charAt(0).toUpperCase()}
+              </div>
+              <span className="text-white font-semibold text-sm">{playerNickname}</span>
+              <Icon name="ChevronDown" size={16} className="text-[#b5bac1]" />
+            </button>
+          )}
+        </div>
         <div className="text-center max-w-md mx-auto px-6 py-8 animate-fade-in">
           <div className="mb-8">
             <h1 className="text-5xl font-extrabold text-white mb-3 tracking-tight">DODGEBALL</h1>
