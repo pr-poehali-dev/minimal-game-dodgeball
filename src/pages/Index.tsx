@@ -51,8 +51,8 @@ type Particle = {
 
 type GameState = 'menu' | 'playing' | 'results';
 
-const CANVAS_WIDTH = window.innerWidth;
-const CANVAS_HEIGHT = window.innerHeight;
+const CANVAS_WIDTH = Math.min(window.innerWidth * 1.2, 2000);
+const CANVAS_HEIGHT = Math.min(window.innerHeight * 1.2, 1200);
 const PLAYER_RADIUS = 20;
 const BALL_RADIUS = 8;
 const PLAYER_MAX_SPEED = 5;
@@ -60,8 +60,8 @@ const PLAYER_ACCELERATION = 0.25;
 const FRICTION = 0.92;
 const BALL_FRICTION = 0.985;
 const BALL_BOUNCE = 0.7;
-const THROW_FORCE = 20;
-const AI_REACTION_DELAY = 10;
+const THROW_FORCE = 18;
+const AI_REACTION_DELAY = 15;
 const AI_REACTION_TIME = 30;
 const GRAVITY = 0.5;
 const RESPAWN_TIME = 5000;
@@ -257,7 +257,7 @@ export default function Index() {
 
             const nearestThreat = incomingBalls
               .map(b => ({ ball: b, dist: distance(b.position, player.position) }))
-              .filter(({ dist }) => dist < 250)
+              .filter(({ dist }) => dist < 300)
               .sort((a, b) => a.dist - b.dist)[0];
 
             if (nearestThreat) {
@@ -270,8 +270,8 @@ export default function Index() {
               const perpDir = { x: -awayDir.y, y: awayDir.x };
               const dodgeChoice = Math.random() > 0.5 ? 1 : -1;
               
-              player.velocity.x += (awayDir.x * 0.7 + perpDir.x * dodgeChoice * 0.3) * PLAYER_ACCELERATION * 1.8;
-              player.velocity.y += (awayDir.y * 0.7 + perpDir.y * dodgeChoice * 0.3) * PLAYER_ACCELERATION * 1.8;
+              player.velocity.x += (awayDir.x * 0.7 + perpDir.x * dodgeChoice * 0.3) * PLAYER_ACCELERATION * 2.2;
+              player.velocity.y += (awayDir.y * 0.7 + perpDir.y * dodgeChoice * 0.3) * PLAYER_ACCELERATION * 2.2;
               player.aiTimer = 0;
             } else if (!player.hasBall) {
               const freeBalls = balls.filter(b => !b.owner && !b.justThrown);
@@ -309,7 +309,7 @@ export default function Index() {
                   y: target.position.y + target.velocity.y * leadTime * 0.5,
                 };
                 throwBall(player, predictedPos);
-                player.throwDelay = Math.random() * 180 + 60;
+                player.throwDelay = Math.random() * 240 + 90;
                 player.aiTimer = 0;
                 player.scale = 1.3;
               } else {
