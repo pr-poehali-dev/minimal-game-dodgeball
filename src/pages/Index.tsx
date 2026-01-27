@@ -933,7 +933,10 @@ export default function Index() {
 
   if (gameState === 'menu') {
     return (
-      <div className="w-screen h-screen flex items-center justify-center bg-[#2b2d31] relative">
+      <div className="w-screen h-screen flex items-center justify-center bg-[#2b2d31] relative" style={{
+        backgroundImage: 'radial-gradient(circle, rgba(88, 101, 242, 0.05) 1px, transparent 1px)',
+        backgroundSize: '20px 20px'
+      }}>
         <div className="absolute top-6 right-6">
           {isEditingProfile ? (
             <div className="bg-[#1e1f22] rounded-lg p-4 shadow-xl w-64">
@@ -1081,7 +1084,10 @@ export default function Index() {
     const playerWon = player?.isAlive && score[player.team] > 0;
 
     return (
-      <div className="w-screen h-screen flex items-center justify-center bg-[#2b2d31]">
+      <div className="w-screen h-screen flex items-center justify-center bg-[#2b2d31]" style={{
+        backgroundImage: 'radial-gradient(circle, rgba(88, 101, 242, 0.05) 1px, transparent 1px)',
+        backgroundSize: '20px 20px'
+      }}>
         <div className="text-center max-w-md mx-auto px-6 animate-fade-in">
           <div className="mb-8">
             <div className={`inline-flex items-center justify-center w-20 h-20 rounded-full mb-4 ${
@@ -1131,7 +1137,10 @@ export default function Index() {
   }
 
   return (
-    <div className="relative w-screen h-screen overflow-hidden">
+    <div className="relative w-screen h-screen overflow-hidden" style={{
+      backgroundImage: 'radial-gradient(circle, rgba(88, 101, 242, 0.05) 1px, transparent 1px)',
+      backgroundSize: '20px 20px'
+    }}>
       <canvas
         ref={canvasRef}
         width={CANVAS_WIDTH}
