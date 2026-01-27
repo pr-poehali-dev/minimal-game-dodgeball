@@ -184,14 +184,25 @@ export default function Index() {
       const alivePlayers = players.filter(p => p.isAlive);
       const maxKills = Math.max(...alivePlayers.map(p => p.kills), 0);
       
-      alivePlayers.forEach(p => {
-        if (maxKills > 0 && p.kills === maxKills) {
-          p.hasAura = true;
-          p.auraPhase += 0.05;
-        } else {
-          p.hasAura = false;
+      players.forEach(p => p.hasAura = false);
+      
+      if (maxKills > 0) {
+        const topKillers = alivePlayers.filter(p => p.kills === maxKills);
+        
+        if (topKillers.length > 0) {
+          const currentAuraHolder = players.find(p => p.hasAura);
+          
+          let auraTarget;
+          if (currentAuraHolder && topKillers.includes(currentAuraHolder)) {
+            auraTarget = currentAuraHolder;
+          } else {
+            auraTarget = topKillers[0];
+          }
+          
+          auraTarget.hasAura = true;
+          auraTarget.auraPhase += 0.05;
         }
-      });
+      }
 
       ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
       ctx.fillStyle = '#1A1F2C';
