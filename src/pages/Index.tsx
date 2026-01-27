@@ -18,6 +18,9 @@ type Player = {
   respawnTime?: number;
   hitTime?: number;
   deathAnimation?: number;
+  throwAnimation?: number;
+  scale: number;
+  rotation: number;
 };
 
 type Ball = {
@@ -28,6 +31,7 @@ type Ball = {
   justThrown: boolean;
   thrownBy?: string;
   owner?: string;
+  trail: Array<{ x: number; y: number; alpha: number }>;
 };
 
 type Particle = {
@@ -47,12 +51,14 @@ const CANVAS_WIDTH = window.innerWidth;
 const CANVAS_HEIGHT = window.innerHeight;
 const PLAYER_RADIUS = 20;
 const BALL_RADIUS = 8;
-const PLAYER_MAX_SPEED = 4;
-const PLAYER_ACCELERATION = 0.3;
-const FRICTION = 0.88;
-const BALL_FRICTION = 0.97;
-const BALL_BOUNCE = 0.6;
-const THROW_FORCE = 18;
+const PLAYER_MAX_SPEED = 5;
+const PLAYER_ACCELERATION = 0.25;
+const FRICTION = 0.92;
+const BALL_FRICTION = 0.985;
+const BALL_BOUNCE = 0.7;
+const THROW_FORCE = 20;
+const AI_THROW_COOLDOWN = 120;
+const AI_REACTION_TIME = 30;
 const GRAVITY = 0.5;
 const RESPAWN_TIME = 5000;
 const BALL_PICKUP_RADIUS = 30;
@@ -106,7 +112,9 @@ export default function Index() {
           isPlayer: isPlayerControlled,
           hasBall: true,
           aiState: 'idle',
-          aiTimer: Math.random() * 120,
+          aiTimer: Math.random() * AI_THROW_COOLDOWN,
+          scale: 1,
+          rotation: 0,
         };
         newPlayers.push(player);
 
@@ -117,6 +125,7 @@ export default function Index() {
           radius: BALL_RADIUS,
           justThrown: false,
           owner: player.id,
+          trail: [],
         };
         newBalls.push(ball);
       }
@@ -178,11 +187,14 @@ export default function Index() {
             player.isAlive = true;
             player.hasBall = false;
             player.respawnTime = undefined;
+            player.deathAnimation = undefined;
+            player.scale = 0.5;
             player.position = {
               x: player.team === 'purple' ? CANVAS_WIDTH * 0.25 : CANVAS_WIDTH * 0.75,
               y: CANVAS_HEIGHT * 0.5,
             };
             player.velocity = { x: 0, y: 0 };
+            createParticles(player.position.x, player.position.y, player.team === 'purple' ? '#9b87f5' : '#0EA5E9', 15);
           }
           return;
         }
@@ -221,7 +233,7 @@ export default function Index() {
               player.velocity.x += awayDir.x * PLAYER_ACCELERATION * 1.5;
               player.velocity.y += awayDir.y * PLAYER_ACCELERATION * 1.5;
               player.aiTimer = 0;
-            } else if (player.hasBall && enemies.length > 0 && Math.random() < 0.04) {
+            } else if (player.hasBall && enemies.length > 0 && player.aiTimer > AI_THROW_COOLDOWN) {
               player.aiState = 'attack';
               const target = enemies[Math.floor(Math.random() * enemies.length)];
               const leadTime = distance(player.position, target.position) / THROW_FORCE;
@@ -231,6 +243,7 @@ export default function Index() {
               };
               throwBall(player, predictedPos);
               player.aiTimer = 0;
+              player.scale = 1.3;
             } else if (!player.hasBall) {
               const freeBalls = balls.filter(b => !b.owner && !b.justThrown);
               if (freeBalls.length > 0) {
@@ -273,6 +286,25 @@ export default function Index() {
         player.position.x += player.velocity.x;
         player.position.y += player.velocity.y;
 
+        if (speed > 0.5) {
+          player.rotation += speed * 0.05;
+        }
+
+        if (player.scale > 1) {
+          player.scale -= 0.02;
+          if (player.scale < 1) player.scale = 1;
+        } else if (player.scale < 1) {
+          player.scale += 0.02;
+          if (player.scale > 1) player.scale = 1;
+        }
+
+        if (player.throwAnimation !== undefined) {
+          player.throwAnimation--;
+          if (player.throwAnimation <= 0) {
+            player.throwAnimation = undefined;
+          }
+        }
+
         const halfWidth = CANVAS_WIDTH / 2;
         const minX = player.team === 'purple' ? player.radius : halfWidth + player.radius;
         const maxX = player.team === 'purple' ? halfWidth - player.radius : CANVAS_WIDTH - player.radius;
@@ -306,6 +338,19 @@ export default function Index() {
             ball.owner = undefined;
           }
         } else {
+          if (ball.justThrown) {
+            ball.trail.push({ x: ball.position.x, y: ball.position.y, alpha: 1 });
+            if (ball.trail.length > 15) {
+              ball.trail.shift();
+            }
+          } else {
+            ball.trail = ball.trail.filter((_, i) => i > 0);
+          }
+
+          ball.trail.forEach((t, i) => {
+            t.alpha -= 0.05;
+          });
+
           ball.velocity.x *= BALL_FRICTION;
           ball.velocity.y *= BALL_FRICTION;
 
@@ -384,6 +429,8 @@ export default function Index() {
             } else if (!ball.justThrown && !ball.owner && !player.hasBall && dist < BALL_PICKUP_RADIUS) {
               ball.owner = player.id;
               player.hasBall = true;
+              player.scale = 1.2;
+              createParticles(ball.position.x, ball.position.y, player.team === 'purple' ? '#9b87f5' : '#0EA5E9', 8);
             }
           });
         }
@@ -455,11 +502,16 @@ export default function Index() {
           ctx.globalAlpha = 1 - flashProgress * 0.5;
         }
 
+        ctx.save();
+        ctx.translate(player.position.x, player.position.y);
+        ctx.scale(player.scale, player.scale);
+        ctx.rotate(player.rotation);
+
         ctx.shadowBlur = 15;
         ctx.shadowColor = player.team === 'purple' ? '#9b87f5' : '#0EA5E9';
         ctx.fillStyle = player.team === 'purple' ? '#9b87f5' : '#0EA5E9';
         ctx.beginPath();
-        ctx.arc(player.position.x, player.position.y, player.radius, 0, Math.PI * 2);
+        ctx.arc(0, 0, player.radius, 0, Math.PI * 2);
         ctx.fill();
         ctx.shadowBlur = 0;
         ctx.globalAlpha = 1;
@@ -468,15 +520,36 @@ export default function Index() {
           ctx.strokeStyle = '#FFFFFF';
           ctx.lineWidth = 3;
           ctx.beginPath();
-          ctx.arc(player.position.x, player.position.y, player.radius + 5, 0, Math.PI * 2);
+          ctx.arc(0, 0, player.radius + 5, 0, Math.PI * 2);
           ctx.stroke();
         }
+
+        if (player.hasBall) {
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+          ctx.beginPath();
+          ctx.arc(0, 0, player.radius * 0.4, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        ctx.restore();
       });
 
       balls.forEach((ball) => {
         if (ball.owner) return;
 
-        ctx.shadowBlur = 10;
+        ball.trail.forEach((t, i) => {
+          const alpha = t.alpha * (i / ball.trail.length);
+          if (alpha > 0) {
+            ctx.globalAlpha = alpha;
+            ctx.fillStyle = '#FF6B6B';
+            ctx.beginPath();
+            ctx.arc(t.x, t.y, ball.radius * 0.7, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        });
+        ctx.globalAlpha = 1;
+
+        ctx.shadowBlur = ball.justThrown ? 15 : 10;
         ctx.shadowColor = ball.justThrown ? '#FF6B6B' : '#FFFFFF';
         ctx.fillStyle = ball.justThrown ? '#FF6B6B' : '#FFFFFF';
         ctx.beginPath();
@@ -509,7 +582,12 @@ export default function Index() {
         ball.velocity = { x: dir.x * THROW_FORCE, y: dir.y * THROW_FORCE };
         ball.justThrown = true;
         ball.thrownBy = player.id;
+        ball.trail = [];
         player.hasBall = false;
+        player.throwAnimation = 10;
+        player.scale = 0.8;
+        
+        createParticles(player.position.x + dir.x * 20, player.position.y + dir.y * 20, '#FFFFFF', 6);
       }
     });
   };
