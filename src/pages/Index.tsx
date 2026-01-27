@@ -89,7 +89,9 @@ export default function Index() {
   const [mousePosition, setMousePosition] = useState<Vector2D>({ x: 0, y: 0 });
   const [playerNickname, setPlayerNickname] = useState('Player');
   const [playerAvatar, setPlayerAvatar] = useState(AVATAR_COLORS[0]);
+  const [customAvatarUrl, setCustomAvatarUrl] = useState<string | null>(null);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   const playersRef = useRef<Player[]>([]);
   const ballsRef = useRef<Ball[]>([]);
@@ -878,16 +880,50 @@ export default function Index() {
               <div className="mb-4">
                 <label className="text-xs font-semibold text-[#b5bac1] uppercase tracking-wide mb-2 block">Avatar Color</label>
                 <div className="grid grid-cols-6 gap-2">
-                  {AVATAR_COLORS.map(color => (
+                  {AVATAR_COLORS.slice(0, 11).map(color => (
                     <button
                       key={color}
-                      onClick={() => setPlayerAvatar(color)}
+                      onClick={() => {
+                        setPlayerAvatar(color);
+                        setCustomAvatarUrl(null);
+                      }}
                       className={`w-8 h-8 rounded-full transition-all ${
-                        playerAvatar === color ? 'ring-2 ring-white ring-offset-2 ring-offset-[#1e1f22]' : 'hover:scale-110'
+                        playerAvatar === color && !customAvatarUrl ? 'ring-2 ring-white ring-offset-2 ring-offset-[#1e1f22]' : 'hover:scale-110'
                       }`}
                       style={{ backgroundColor: color }}
                     />
                   ))}
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className={`w-8 h-8 rounded-full transition-all flex items-center justify-center ${
+                      customAvatarUrl ? 'ring-2 ring-white ring-offset-2 ring-offset-[#1e1f22]' : 'border-2 border-dashed border-[#5865f2] hover:bg-[#5865f2]/10'
+                    }`}
+                    style={customAvatarUrl ? {
+                      backgroundImage: `url(${customAvatarUrl})`,
+                      backgroundSize: 'cover',
+                      backgroundPosition: 'center'
+                    } : {}}
+                  >
+                    {!customAvatarUrl && <Icon name="Upload" size={14} className="text-[#5865f2]" />}
+                  </button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onload = (event) => {
+                          const url = event.target?.result as string;
+                          setCustomAvatarUrl(url);
+                          setPlayerAvatar(url);
+                        };
+                        reader.readAsDataURL(file);
+                      }
+                    }}
+                  />
                 </div>
               </div>
               <Button
@@ -904,10 +940,14 @@ export default function Index() {
               className="flex items-center gap-3 bg-[#1e1f22] hover:bg-[#2b2d31] rounded-lg p-3 transition-colors"
             >
               <div
-                className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm"
-                style={{ backgroundColor: playerAvatar }}
+                className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm overflow-hidden"
+                style={customAvatarUrl ? {
+                  backgroundImage: `url(${customAvatarUrl})`,
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center'
+                } : { backgroundColor: playerAvatar }}
               >
-                {playerNickname.charAt(0).toUpperCase()}
+                {!customAvatarUrl && playerNickname.charAt(0).toUpperCase()}
               </div>
               <span className="text-white font-semibold text-sm">{playerNickname}</span>
               <Icon name="ChevronDown" size={16} className="text-[#b5bac1]" />
