@@ -28,6 +28,7 @@ type Player = {
   invulnerableUntil?: number;
   nickname: string;
   avatar: string;
+  trail: Array<{ x: number; y: number; alpha: number }>;
 };
 
 type Ball = {
@@ -149,6 +150,20 @@ export default function Index() {
     });
   };
 
+  const createDotPattern = () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 20;
+    canvas.height = 20;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.fillStyle = 'rgba(88, 101, 242, 0.05)';
+      ctx.beginPath();
+      ctx.arc(1, 1, 1, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    return canvas;
+  };
+
   const initGame = useCallback((infinite: boolean, size: number) => {
     const newPlayers: Player[] = [];
     const newBalls: Ball[] = [];
@@ -184,6 +199,7 @@ export default function Index() {
           invulnerableUntil: undefined,
           nickname: isPlayerControlled ? playerNickname : BOT_NAMES[Math.floor(Math.random() * BOT_NAMES.length)],
           avatar: isPlayerControlled ? (customAvatarUrl || playerAvatar) : BOT_AVATARS[Math.floor(Math.random() * BOT_AVATARS.length)],
+          trail: [],
         };
         newPlayers.push(player);
         
@@ -282,6 +298,12 @@ export default function Index() {
       ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
       ctx.fillStyle = '#2b2d31';
       ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+      
+      const dotPattern = ctx.createPattern(createDotPattern(), 'repeat');
+      if (dotPattern) {
+        ctx.fillStyle = dotPattern;
+        ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+      }
 
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
       ctx.lineWidth = 3;
@@ -435,6 +457,19 @@ export default function Index() {
 
         player.position.x += player.velocity.x;
         player.position.y += player.velocity.y;
+
+        if (speed > 1) {
+          player.trail.push({ x: player.position.x, y: player.position.y, alpha: 1 });
+          if (player.trail.length > 6) {
+            player.trail.shift();
+          }
+        } else {
+          player.trail = player.trail.filter((_, i) => i > 0);
+        }
+
+        player.trail.forEach((t) => {
+          t.alpha -= 0.12;
+        });
 
         if (speed > 0.5) {
           player.rotation += speed * 0.05;
@@ -713,6 +748,18 @@ export default function Index() {
           const flashProgress = (Date.now() - player.hitTime) / 200;
           ctx.globalAlpha = 1 - flashProgress * 0.5;
         }
+
+        player.trail.forEach((t, i) => {
+          const alpha = t.alpha * (i / player.trail.length);
+          if (alpha > 0) {
+            ctx.globalAlpha = alpha * 0.4;
+            ctx.fillStyle = player.team === 'purple' ? '#9b87f5' : '#0EA5E9';
+            ctx.beginPath();
+            ctx.arc(t.x, t.y, player.radius * 0.7, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        });
+        ctx.globalAlpha = 1;
 
         const isInvulnerable = player.invulnerableUntil && Date.now() < player.invulnerableUntil;
         
