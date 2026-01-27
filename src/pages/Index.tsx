@@ -126,7 +126,7 @@ export default function Index() {
           kills: 0,
           hasAura: false,
           auraPhase: 0,
-          invulnerableUntil: isPlayerControlled ? Date.now() + 3000 : undefined,
+          invulnerableUntil: undefined,
         };
         newPlayers.push(player);
 
@@ -183,6 +183,16 @@ export default function Index() {
     const gameLoop = () => {
       const players = playersRef.current;
       const balls = ballsRef.current;
+
+      const currentTime = Date.now();
+      const gameStarted = currentTime - gameStartTimeRef.current;
+      
+      if (gameStarted < 3000) {
+        const player = players.find(p => p.isPlayer);
+        if (player && !player.invulnerableUntil) {
+          player.invulnerableUntil = gameStartTimeRef.current + 3000;
+        }
+      }
 
       const alivePlayers = players.filter(p => p.isAlive);
       const maxKills = Math.max(...alivePlayers.map(p => p.kills), 0);
