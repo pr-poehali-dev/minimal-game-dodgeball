@@ -33,11 +33,12 @@ const CANVAS_WIDTH = window.innerWidth;
 const CANVAS_HEIGHT = window.innerHeight;
 const PLAYER_RADIUS = 20;
 const BALL_RADIUS = 8;
-const PLAYER_SPEED = 3;
+const PLAYER_SPEED = 5;
 const BALL_DAMPING = 0.98;
 const BALL_BOUNCE = 0.7;
 const THROW_FORCE = 15;
 const RESPAWN_TIME = 10000;
+const PLAYER_ACCELERATION = 0.15;
 
 export default function Index() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -153,9 +154,10 @@ export default function Index() {
             x: mousePosition.x - player.position.x,
             y: mousePosition.y - player.position.y,
           });
+          const targetVelocity = { x: dir.x * PLAYER_SPEED, y: dir.y * PLAYER_SPEED };
           newPlayer.velocity = {
-            x: dir.x * PLAYER_SPEED,
-            y: dir.y * PLAYER_SPEED,
+            x: player.velocity.x + (targetVelocity.x - player.velocity.x) * PLAYER_ACCELERATION,
+            y: player.velocity.y + (targetVelocity.y - player.velocity.y) * PLAYER_ACCELERATION,
           };
         } else if (!player.isPlayer) {
           const nearestBall = balls
@@ -167,12 +169,16 @@ export default function Index() {
               x: nearestBall.position.x - player.position.x,
               y: nearestBall.position.y - player.position.y,
             });
-            newPlayer.velocity = { x: dir.x * PLAYER_SPEED * 0.5, y: dir.y * PLAYER_SPEED * 0.5 };
+            const targetVelocity = { x: dir.x * PLAYER_SPEED * 0.6, y: dir.y * PLAYER_SPEED * 0.6 };
+            newPlayer.velocity = {
+              x: player.velocity.x + (targetVelocity.x - player.velocity.x) * 0.1,
+              y: player.velocity.y + (targetVelocity.y - player.velocity.y) * 0.1,
+            };
           } else {
-            newPlayer.velocity = { x: newPlayer.velocity.x * 0.9, y: newPlayer.velocity.y * 0.9 };
+            newPlayer.velocity = { x: player.velocity.x * 0.85, y: player.velocity.y * 0.85 };
           }
 
-          if (player.hasBall && Math.random() < 0.01) {
+          if (player.hasBall && Math.random() < 0.02) {
             const enemies = players.filter((p) => p.team !== player.team && p.isAlive);
             if (enemies.length > 0) {
               const target = enemies[Math.floor(Math.random() * enemies.length)];
@@ -180,7 +186,7 @@ export default function Index() {
             }
           }
         } else {
-          newPlayer.velocity = { x: newPlayer.velocity.x * 0.9, y: newPlayer.velocity.y * 0.9 };
+          newPlayer.velocity = { x: player.velocity.x * 0.85, y: player.velocity.y * 0.85 };
         }
 
         newPlayer.position = {
