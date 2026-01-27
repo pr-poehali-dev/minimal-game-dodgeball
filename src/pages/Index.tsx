@@ -15,6 +15,7 @@ type Player = {
   hasBall: boolean;
   aiState: 'idle' | 'chase' | 'attack' | 'evade';
   aiTimer: number;
+  throwDelay: number;
   respawnTime?: number;
   hitTime?: number;
   deathAnimation?: number;
@@ -57,7 +58,7 @@ const FRICTION = 0.92;
 const BALL_FRICTION = 0.985;
 const BALL_BOUNCE = 0.7;
 const THROW_FORCE = 20;
-const AI_THROW_COOLDOWN = 120;
+const AI_REACTION_DELAY = 10;
 const AI_REACTION_TIME = 30;
 const GRAVITY = 0.5;
 const RESPAWN_TIME = 5000;
@@ -114,7 +115,8 @@ export default function Index() {
           isPlayer: isPlayerControlled,
           hasBall: true,
           aiState: 'idle',
-          aiTimer: Math.random() * AI_THROW_COOLDOWN,
+          aiTimer: 0,
+          throwDelay: Math.random() * 180 + 60,
           scale: 1,
           rotation: 0,
         };
@@ -139,7 +141,7 @@ export default function Index() {
     gameStartTimeRef.current = Date.now();
     setInfiniteMode(infinite);
     setScore({ purple: 5, blue: 5 });
-    setCountdown(2);
+    setCountdown(null);
     setGameState('playing');
   }, []);
 
@@ -173,17 +175,7 @@ export default function Index() {
     const gameLoop = () => {
       const players = playersRef.current;
       const balls = ballsRef.current;
-      const elapsed = Date.now() - gameStartTimeRef.current;
-      const gameStarted = elapsed >= 2000;
 
-      if (!gameStarted) {
-        const remaining = Math.ceil((2000 - elapsed) / 1000);
-        if (remaining !== countdown) {
-          setCountdown(remaining);
-        }
-      } else if (countdown !== null) {
-        setCountdown(null);
-      }
 
       ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
       ctx.fillStyle = '#1A1F2C';
@@ -229,36 +221,32 @@ export default function Index() {
         } else {
           player.aiTimer++;
 
-          if (player.aiTimer > 60) {
+          if (player.aiTimer > AI_REACTION_DELAY) {
             const enemies = players.filter(p => p.team !== player.team && p.isAlive);
             const incomingBalls = balls.filter(b => 
               b.justThrown && 
               b.thrownBy && 
-              players.find(p => p.id === b.thrownBy)?.team !== player.team &&
-              distance(b.position, player.position) < 200
+              players.find(p => p.id === b.thrownBy)?.team !== player.team
             );
 
-            if (incomingBalls.length > 0 && Math.random() < 0.3) {
+            const nearestThreat = incomingBalls
+              .map(b => ({ ball: b, dist: distance(b.position, player.position) }))
+              .filter(({ dist }) => dist < 250)
+              .sort((a, b) => a.dist - b.dist)[0];
+
+            if (nearestThreat) {
               player.aiState = 'evade';
-              const ball = incomingBalls[0];
+              const ball = nearestThreat.ball;
               const awayDir = normalize({
                 x: player.position.x - ball.position.x,
                 y: player.position.y - ball.position.y,
               });
-              player.velocity.x += awayDir.x * PLAYER_ACCELERATION * 1.5;
-              player.velocity.y += awayDir.y * PLAYER_ACCELERATION * 1.5;
+              const perpDir = { x: -awayDir.y, y: awayDir.x };
+              const dodgeChoice = Math.random() > 0.5 ? 1 : -1;
+              
+              player.velocity.x += (awayDir.x * 0.7 + perpDir.x * dodgeChoice * 0.3) * PLAYER_ACCELERATION * 1.8;
+              player.velocity.y += (awayDir.y * 0.7 + perpDir.y * dodgeChoice * 0.3) * PLAYER_ACCELERATION * 1.8;
               player.aiTimer = 0;
-            } else if (gameStarted && player.hasBall && enemies.length > 0 && player.aiTimer > AI_THROW_COOLDOWN) {
-              player.aiState = 'attack';
-              const target = enemies[Math.floor(Math.random() * enemies.length)];
-              const leadTime = distance(player.position, target.position) / THROW_FORCE;
-              const predictedPos = {
-                x: target.position.x + target.velocity.x * leadTime * 0.5,
-                y: target.position.y + target.velocity.y * leadTime * 0.5,
-              };
-              throwBall(player, predictedPos);
-              player.aiTimer = 0;
-              player.scale = 1.3;
             } else if (!player.hasBall) {
               const freeBalls = balls.filter(b => !b.owner && !b.justThrown);
               if (freeBalls.length > 0) {
@@ -270,21 +258,67 @@ export default function Index() {
                   x: nearest.position.x - player.position.x,
                   y: nearest.position.y - player.position.y,
                 });
-                player.velocity.x += dir.x * PLAYER_ACCELERATION * 0.8;
-                player.velocity.y += dir.y * PLAYER_ACCELERATION * 0.8;
+                player.velocity.x += dir.x * PLAYER_ACCELERATION * 1.2;
+                player.velocity.y += dir.y * PLAYER_ACCELERATION * 1.2;
               } else {
                 player.aiState = 'idle';
+                if (Math.random() < 0.015) {
+                  const randomDir = {
+                    x: (Math.random() - 0.5) * 2,
+                    y: (Math.random() - 0.5) * 2,
+                  };
+                  player.velocity.x += randomDir.x * PLAYER_ACCELERATION * 0.4;
+                  player.velocity.y += randomDir.y * PLAYER_ACCELERATION * 0.4;
+                }
+              }
+            } else if (gameStarted && player.hasBall && enemies.length > 0) {
+              player.throwDelay--;
+              
+              if (player.throwDelay <= 0) {
+                player.aiState = 'attack';
+                const target = enemies[Math.floor(Math.random() * enemies.length)];
+                const leadTime = distance(player.position, target.position) / THROW_FORCE;
+                const predictedPos = {
+                  x: target.position.x + target.velocity.x * leadTime * 0.5,
+                  y: target.position.y + target.velocity.y * leadTime * 0.5,
+                };
+                throwBall(player, predictedPos);
+                player.throwDelay = Math.random() * 180 + 60;
+                player.aiTimer = 0;
+                player.scale = 1.3;
+              } else {
+                player.aiState = 'idle';
+                if (Math.random() < 0.02) {
+                  const moveChoice = Math.random();
+                  if (moveChoice < 0.3) {
+                    const closestEnemy = enemies.reduce((prev, curr) => 
+                      distance(curr.position, player.position) < distance(prev.position, player.position) ? curr : prev
+                    );
+                    const dir = normalize({
+                      x: closestEnemy.position.x - player.position.x,
+                      y: closestEnemy.position.y - player.position.y,
+                    });
+                    player.velocity.x += dir.x * PLAYER_ACCELERATION * 0.5;
+                    player.velocity.y += dir.y * PLAYER_ACCELERATION * 0.5;
+                  } else if (moveChoice < 0.6) {
+                    const awayDir = {
+                      x: player.team === 'purple' ? -1 : 1,
+                      y: (Math.random() - 0.5) * 2,
+                    };
+                    player.velocity.x += awayDir.x * PLAYER_ACCELERATION * 0.3;
+                    player.velocity.y += awayDir.y * PLAYER_ACCELERATION * 0.3;
+                  } else {
+                    const randomDir = {
+                      x: (Math.random() - 0.5) * 2,
+                      y: (Math.random() - 0.5) * 2,
+                    };
+                    player.velocity.x += randomDir.x * PLAYER_ACCELERATION * 0.3;
+                    player.velocity.y += randomDir.y * PLAYER_ACCELERATION * 0.3;
+                  }
+                }
               }
             } else {
               player.aiState = 'idle';
-              if (Math.random() < 0.02) {
-                const randomDir = {
-                  x: (Math.random() - 0.5) * 2,
-                  y: (Math.random() - 0.5) * 2,
-                };
-                player.velocity.x += randomDir.x * PLAYER_ACCELERATION * 0.3;
-                player.velocity.y += randomDir.y * PLAYER_ACCELERATION * 0.3;
-              }
             }
           }
         }
@@ -573,29 +607,7 @@ export default function Index() {
         ctx.shadowBlur = 0;
       });
 
-      if (!gameStarted && countdown !== null) {
-        ctx.save();
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
-        ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-        
-        ctx.font = 'bold 120px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        
-        const scale = 1 + (1 - (elapsed % 1000) / 1000) * 0.3;
-        ctx.save();
-        ctx.translate(CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2);
-        ctx.scale(scale, scale);
-        
-        ctx.shadowBlur = 30;
-        ctx.shadowColor = '#9b87f5';
-        ctx.fillStyle = '#FFFFFF';
-        ctx.fillText(countdown.toString(), 0, 0);
-        ctx.shadowBlur = 0;
-        
-        ctx.restore();
-        ctx.restore();
-      }
+
 
       animationFrameRef.current = requestAnimationFrame(gameLoop);
     };
@@ -653,10 +665,6 @@ export default function Index() {
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
-
-    const elapsed = Date.now() - gameStartTimeRef.current;
-    const gameStarted = elapsed >= 2000;
-    if (!gameStarted) return;
 
     const clickPos = { x: e.clientX - rect.left, y: e.clientY - rect.top };
     const players = playersRef.current;
