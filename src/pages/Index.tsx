@@ -271,7 +271,7 @@ export default function Index() {
                   player.velocity.y += randomDir.y * PLAYER_ACCELERATION * 0.4;
                 }
               }
-            } else if (gameStarted && player.hasBall && enemies.length > 0) {
+            } else if (player.hasBall && enemies.length > 0) {
               player.throwDelay--;
               
               if (player.throwDelay <= 0) {
