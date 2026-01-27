@@ -1155,7 +1155,7 @@ export default function Index() {
       </div>
       {infiniteMode && (
         <div className="absolute top-8 right-8 text-white text-sm bg-muted px-4 py-2 rounded-lg">
-          Бесконечный режим
+          Infinite Mode
         </div>
       )}
     </div>
