@@ -219,11 +219,11 @@ export default function Index() {
       }
 
       ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-      ctx.fillStyle = '#1A1F2C';
+      ctx.fillStyle = '#2b2d31';
       ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
-      ctx.lineWidth = 2;
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
+      ctx.lineWidth = 3;
       ctx.beginPath();
       ctx.moveTo(CANVAS_WIDTH / 2, 0);
       ctx.lineTo(CANVAS_WIDTH / 2, CANVAS_HEIGHT);
@@ -824,48 +824,52 @@ export default function Index() {
 
   if (gameState === 'menu') {
     return (
-      <div className="w-screen h-screen flex items-center justify-center bg-background">
-        <div className="text-center space-y-8 animate-fade-in">
-          <h1 className="text-7xl font-bold text-white tracking-tight">ВЫШИБАЛЫ</h1>
-          <p className="text-xl text-muted-foreground">Минималистичная игра в додж-бол</p>
-          <div className="flex flex-col gap-4 mt-12">
-            <Button
-              size="lg"
-              className="text-lg px-12 py-6 bg-primary hover:bg-primary/90"
-              onClick={() => initGame(false, teamSize)}
-            >
-              Начать игру
-            </Button>
-            <Button
-              size="lg"
-              variant="outline"
-              className="text-lg px-12 py-6"
-              onClick={() => initGame(true, teamSize)}
-            >
-              Бесконечный режим
-            </Button>
+      <div className="w-screen h-screen flex items-center justify-center bg-[#2b2d31]">
+        <div className="text-center max-w-md mx-auto px-6 py-8 animate-fade-in">
+          <div className="mb-8">
+            <h1 className="text-5xl font-extrabold text-white mb-3 tracking-tight">ВЫШИБАЛЫ</h1>
+            <p className="text-sm text-[#b5bac1]">Классическая игра в додж-бол</p>
           </div>
-          <div className="mt-8">
-            <p className="text-sm text-muted-foreground mb-3">Размер команды</p>
-            <div className="flex gap-2 justify-center">
+          
+          <div className="bg-[#1e1f22] rounded-lg p-6 mb-4">
+            <p className="text-xs font-semibold text-[#b5bac1] uppercase tracking-wide mb-3">Размер команды</p>
+            <div className="flex gap-2 justify-center mb-6">
               {[1, 2, 3, 4, 5].map(size => (
                 <button
                   key={size}
                   onClick={() => setTeamSize(size)}
-                  className={`w-10 h-10 rounded-lg transition-all ${
+                  className={`w-12 h-12 rounded-md font-bold text-sm transition-all ${
                     teamSize === size
-                      ? 'bg-primary text-primary-foreground scale-110 shadow-lg'
-                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                      ? 'bg-[#5865f2] text-white shadow-lg scale-105'
+                      : 'bg-[#2b2d31] text-[#b5bac1] hover:bg-[#35373c]'
                   }`}
                 >
                   {size}
                 </button>
               ))}
             </div>
+            
+            <div className="flex flex-col gap-2">
+              <Button
+                size="lg"
+                className="w-full bg-[#5865f2] hover:bg-[#4752c4] text-white font-semibold h-11 rounded-md"
+                onClick={() => initGame(false, teamSize)}
+              >
+                Начать игру
+              </Button>
+              <Button
+                size="lg"
+                className="w-full bg-[#2b2d31] hover:bg-[#35373c] text-white font-semibold h-11 rounded-md"
+                onClick={() => initGame(true, teamSize)}
+              >
+                Бесконечный режим
+              </Button>
+            </div>
           </div>
-          <div className="mt-8 text-sm text-muted-foreground space-y-2">
-            <p>Двигай мышкой для управления</p>
-            <p>Кликни чтобы бросить мяч</p>
+          
+          <div className="text-xs text-[#80848e] space-y-1">
+            <p>• Двигай мышкой для управления персонажем</p>
+            <p>• Кликни чтобы бросить мяч</p>
           </div>
         </div>
       </div>
@@ -878,29 +882,49 @@ export default function Index() {
     const playerWon = player?.isAlive && score[player.team] > 0;
 
     return (
-      <div className="w-screen h-screen flex items-center justify-center bg-background">
-        <div className="text-center space-y-8 animate-fade-in">
-          <h1 className="text-7xl font-bold text-white">
-            {playerWon ? 'ПОБЕДА' : 'ПОРАЖЕНИЕ'}
-          </h1>
-          <p className="text-2xl text-muted-foreground">
-            Счёт: {score.purple} - {score.blue}
-          </p>
-          <div className="flex flex-col items-center gap-3 mt-12">
+      <div className="w-screen h-screen flex items-center justify-center bg-[#2b2d31]">
+        <div className="text-center max-w-md mx-auto px-6 animate-fade-in">
+          <div className="mb-8">
+            <div className={`inline-flex items-center justify-center w-20 h-20 rounded-full mb-4 ${
+              playerWon ? 'bg-[#3ba55d]/20' : 'bg-[#ed4245]/20'
+            }`}>
+              <Icon 
+                name={playerWon ? 'Trophy' : 'X'} 
+                size={40} 
+                className={playerWon ? 'text-[#3ba55d]' : 'text-[#ed4245]'}
+              />
+            </div>
+            <h1 className="text-4xl font-extrabold text-white mb-2">
+              {playerWon ? 'ПОБЕДА!' : 'ПОРАЖЕНИЕ'}
+            </h1>
+            <div className="flex items-center justify-center gap-4 text-xl font-bold text-[#b5bac1]">
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 rounded-full bg-[#9b87f5]"></div>
+                <span>{score.purple}</span>
+              </div>
+              <span className="text-[#4e5058]">—</span>
+              <div className="flex items-center gap-2">
+                <span>{score.blue}</span>
+                <div className="w-4 h-4 rounded-full bg-[#0EA5E9]"></div>
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-[#1e1f22] rounded-lg p-6 space-y-2">
             <Button
               size="lg"
-              className="text-xl px-16 py-7 bg-primary hover:bg-primary/90"
+              className="w-full bg-[#5865f2] hover:bg-[#4752c4] text-white font-semibold h-11 rounded-md"
               onClick={() => initGame(infiniteMode, teamSize)}
             >
-              <Icon name="RotateCcw" className="mr-2" size={24} />
-              Заново
+              <Icon name="RotateCcw" className="mr-2" size={18} />
+              Играть ещё раз
             </Button>
             <Button
-              variant="ghost"
-              className="text-sm text-muted-foreground hover:text-foreground"
+              size="lg"
+              className="w-full bg-[#2b2d31] hover:bg-[#35373c] text-[#b5bac1] font-semibold h-11 rounded-md"
               onClick={() => setGameState('menu')}
             >
-              В меню
+              Главное меню
             </Button>
           </div>
         </div>
@@ -918,15 +942,17 @@ export default function Index() {
         onMouseMove={handleMouseMove}
         onClick={handleCanvasClick}
       />
-      <div className="absolute top-8 left-1/2 transform -translate-x-1/2 flex items-center gap-8 text-white text-2xl font-bold">
-        <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-full bg-[#9b87f5]"></div>
-          <span>{score.purple}</span>
-        </div>
-        <span className="text-muted-foreground">VS</span>
-        <div className="flex items-center gap-2">
-          <span>{score.blue}</span>
-          <div className="w-6 h-6 rounded-full bg-[#0EA5E9]"></div>
+      <div className="absolute top-6 left-1/2 transform -translate-x-1/2 bg-[#1e1f22] rounded-lg px-6 py-3 shadow-xl">
+        <div className="flex items-center gap-6 text-white text-xl font-bold">
+          <div className="flex items-center gap-2">
+            <div className="w-5 h-5 rounded-full bg-[#9b87f5] shadow-lg"></div>
+            <span className="tabular-nums">{score.purple}</span>
+          </div>
+          <span className="text-[#4e5058] text-sm font-medium">VS</span>
+          <div className="flex items-center gap-2">
+            <span className="tabular-nums">{score.blue}</span>
+            <div className="w-5 h-5 rounded-full bg-[#0EA5E9] shadow-lg"></div>
+          </div>
         </div>
       </div>
       {infiniteMode && (
