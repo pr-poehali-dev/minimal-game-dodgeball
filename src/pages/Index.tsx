@@ -273,32 +273,34 @@ export default function Index() {
             ball.owner = undefined;
           }
         } else {
-          ball.velocity.y += GRAVITY * 0.3;
           ball.velocity.x *= BALL_FRICTION;
           ball.velocity.y *= BALL_FRICTION;
 
+          const prevX = ball.position.x;
           ball.position.x += ball.velocity.x;
           ball.position.y += ball.velocity.y;
+
+          const halfWidth = CANVAS_WIDTH / 2;
+          if ((prevX < halfWidth && ball.position.x >= halfWidth) || 
+              (prevX > halfWidth && ball.position.x <= halfWidth)) {
+            ball.justThrown = false;
+          }
 
           if (ball.position.x - ball.radius < 0) {
             ball.position.x = ball.radius;
             ball.velocity.x *= -BALL_BOUNCE;
-            ball.justThrown = false;
           }
           if (ball.position.x + ball.radius > CANVAS_WIDTH) {
             ball.position.x = CANVAS_WIDTH - ball.radius;
             ball.velocity.x *= -BALL_BOUNCE;
-            ball.justThrown = false;
           }
           if (ball.position.y - ball.radius < 0) {
             ball.position.y = ball.radius;
             ball.velocity.y *= -BALL_BOUNCE;
-            ball.justThrown = false;
           }
           if (ball.position.y + ball.radius > CANVAS_HEIGHT) {
             ball.position.y = CANVAS_HEIGHT - ball.radius;
             ball.velocity.y *= -BALL_BOUNCE;
-            ball.justThrown = false;
           }
 
           const speed = Math.sqrt(ball.velocity.x ** 2 + ball.velocity.y ** 2);
@@ -319,6 +321,8 @@ export default function Index() {
                 player.respawnTime = infiniteMode ? Date.now() + RESPAWN_TIME : undefined;
                 ball.justThrown = false;
                 ball.thrownBy = undefined;
+                ball.velocity.x *= 0.3;
+                ball.velocity.y *= 0.3;
               }
             } else if (!ball.justThrown && !ball.owner && !player.hasBall && dist < BALL_PICKUP_RADIUS) {
               ball.owner = player.id;
@@ -403,10 +407,6 @@ export default function Index() {
         ball.justThrown = true;
         ball.thrownBy = player.id;
         player.hasBall = false;
-
-        setTimeout(() => {
-          ball.justThrown = false;
-        }, 300);
       }
     });
   };
