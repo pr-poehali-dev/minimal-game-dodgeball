@@ -22,6 +22,9 @@ type Player = {
   throwAnimation?: number;
   scale: number;
   rotation: number;
+  kills: number;
+  hasAura: boolean;
+  auraPhase: number;
 };
 
 type Ball = {
@@ -118,6 +121,9 @@ export default function Index() {
           throwDelay: Math.random() * 180 + 60,
           scale: 1,
           rotation: 0,
+          kills: 0,
+          hasAura: false,
+          auraPhase: 0,
         };
         newPlayers.push(player);
 
@@ -175,6 +181,17 @@ export default function Index() {
       const players = playersRef.current;
       const balls = ballsRef.current;
 
+      const alivePlayers = players.filter(p => p.isAlive);
+      const maxKills = Math.max(...alivePlayers.map(p => p.kills), 0);
+      
+      alivePlayers.forEach(p => {
+        if (maxKills > 0 && p.kills === maxKills) {
+          p.hasAura = true;
+          p.auraPhase += 0.05;
+        } else {
+          p.hasAura = false;
+        }
+      });
 
       ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
       ctx.fillStyle = '#1A1F2C';
@@ -321,9 +338,10 @@ export default function Index() {
         }
 
         const speed = Math.sqrt(player.velocity.x ** 2 + player.velocity.y ** 2);
-        if (speed > PLAYER_MAX_SPEED) {
-          player.velocity.x = (player.velocity.x / speed) * PLAYER_MAX_SPEED;
-          player.velocity.y = (player.velocity.y / speed) * PLAYER_MAX_SPEED;
+        const maxSpeed = player.hasAura ? PLAYER_MAX_SPEED * 1.2 : PLAYER_MAX_SPEED;
+        if (speed > maxSpeed) {
+          player.velocity.x = (player.velocity.x / speed) * maxSpeed;
+          player.velocity.y = (player.velocity.y / speed) * maxSpeed;
         }
 
         player.velocity.x *= FRICTION;
@@ -446,6 +464,9 @@ export default function Index() {
                 player.hitTime = Date.now();
                 player.deathAnimation = 0;
                 player.respawnTime = infiniteMode ? Date.now() + RESPAWN_TIME : undefined;
+                player.kills = 0;
+                
+                thrower.kills++;
                 
                 const hitColor = player.team === 'purple' ? '#9b87f5' : '#0EA5E9';
                 createParticles(player.position.x, player.position.y, hitColor, 20);
@@ -600,13 +621,43 @@ export default function Index() {
           ctx.globalAlpha = 1 - flashProgress * 0.5;
         }
 
+        if (player.hasAura) {
+          const auraSize1 = player.radius + 15 + Math.sin(player.auraPhase) * 5;
+          const auraSize2 = player.radius + 25 + Math.sin(player.auraPhase + Math.PI) * 5;
+          
+          ctx.save();
+          ctx.translate(player.position.x, player.position.y);
+          
+          const gradient1 = ctx.createRadialGradient(0, 0, player.radius, 0, 0, auraSize1);
+          gradient1.addColorStop(0, 'rgba(139, 0, 0, 0)');
+          gradient1.addColorStop(0.7, 'rgba(139, 0, 0, 0.4)');
+          gradient1.addColorStop(1, 'rgba(139, 0, 0, 0)');
+          
+          ctx.fillStyle = gradient1;
+          ctx.beginPath();
+          ctx.arc(0, 0, auraSize1, 0, Math.PI * 2);
+          ctx.fill();
+          
+          const gradient2 = ctx.createRadialGradient(0, 0, player.radius, 0, 0, auraSize2);
+          gradient2.addColorStop(0, 'rgba(255, 0, 0, 0)');
+          gradient2.addColorStop(0.6, 'rgba(255, 0, 0, 0.3)');
+          gradient2.addColorStop(1, 'rgba(255, 0, 0, 0)');
+          
+          ctx.fillStyle = gradient2;
+          ctx.beginPath();
+          ctx.arc(0, 0, auraSize2, 0, Math.PI * 2);
+          ctx.fill();
+          
+          ctx.restore();
+        }
+
         ctx.save();
         ctx.translate(player.position.x, player.position.y);
         ctx.scale(player.scale, player.scale);
         ctx.rotate(player.rotation);
 
-        ctx.shadowBlur = 15;
-        ctx.shadowColor = player.team === 'purple' ? '#9b87f5' : '#0EA5E9';
+        ctx.shadowBlur = player.hasAura ? 25 : 15;
+        ctx.shadowColor = player.hasAura ? '#8B0000' : (player.team === 'purple' ? '#9b87f5' : '#0EA5E9');
         ctx.fillStyle = player.team === 'purple' ? '#9b87f5' : '#0EA5E9';
         ctx.beginPath();
         ctx.arc(0, 0, player.radius, 0, Math.PI * 2);
