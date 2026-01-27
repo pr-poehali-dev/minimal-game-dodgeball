@@ -105,7 +105,7 @@ export default function Index() {
       const xBase = isLeftTeam ? CANVAS_WIDTH * 0.25 : CANVAS_WIDTH * 0.75;
 
       for (let i = 0; i < size; i++) {
-        const isPlayerControlled = teamColor === playerTeam && i === 2;
+        const isPlayerControlled = teamColor === playerTeam && i === Math.floor(size / 2);
         const player: Player = {
           id: `${teamColor}-${i}`,
           position: {
@@ -191,6 +191,7 @@ export default function Index() {
         const player = players.find(p => p.isPlayer);
         if (player && !player.invulnerableUntil) {
           player.invulnerableUntil = gameStartTimeRef.current + 3000;
+          console.log('🛡️ Invulnerability activated until:', new Date(player.invulnerableUntil).toISOString());
         }
       }
 
@@ -484,7 +485,13 @@ export default function Index() {
             if (ball.justThrown && ball.thrownBy !== player.id) {
               const thrower = players.find(p => p.id === ball.thrownBy);
               const isInvulnerable = player.invulnerableUntil && Date.now() < player.invulnerableUntil;
+              if (player.isPlayer && isInvulnerable) {
+                console.log('🛡️ Player protected by invulnerability');
+              }
               if (thrower && thrower.team !== player.team && dist < ball.radius + player.radius && !isInvulnerable) {
+                if (player.isPlayer) {
+                  console.log('💀 Player hit! invulnerableUntil:', player.invulnerableUntil, 'currentTime:', Date.now());
+                }
                 player.isAlive = false;
                 player.hitTime = Date.now();
                 player.deathAnimation = 0;
