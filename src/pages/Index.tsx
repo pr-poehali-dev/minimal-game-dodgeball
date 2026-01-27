@@ -75,6 +75,8 @@ export default function Index() {
   const ballsRef = useRef<Ball[]>([]);
   const particlesRef = useRef<Particle[]>([]);
   const animationFrameRef = useRef<number>();
+  const gameStartTimeRef = useRef<number>(0);
+  const [countdown, setCountdown] = useState<number | null>(null);
 
   const distance = (a: Vector2D, b: Vector2D) => {
     const dx = a.x - b.x;
@@ -134,8 +136,10 @@ export default function Index() {
     playersRef.current = newPlayers;
     ballsRef.current = newBalls;
     particlesRef.current = [];
+    gameStartTimeRef.current = Date.now();
     setInfiniteMode(infinite);
     setScore({ purple: 5, blue: 5 });
+    setCountdown(2);
     setGameState('playing');
   }, []);
 
@@ -169,6 +173,17 @@ export default function Index() {
     const gameLoop = () => {
       const players = playersRef.current;
       const balls = ballsRef.current;
+      const elapsed = Date.now() - gameStartTimeRef.current;
+      const gameStarted = elapsed >= 2000;
+
+      if (!gameStarted) {
+        const remaining = Math.ceil((2000 - elapsed) / 1000);
+        if (remaining !== countdown) {
+          setCountdown(remaining);
+        }
+      } else if (countdown !== null) {
+        setCountdown(null);
+      }
 
       ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
       ctx.fillStyle = '#1A1F2C';
@@ -233,7 +248,7 @@ export default function Index() {
               player.velocity.x += awayDir.x * PLAYER_ACCELERATION * 1.5;
               player.velocity.y += awayDir.y * PLAYER_ACCELERATION * 1.5;
               player.aiTimer = 0;
-            } else if (player.hasBall && enemies.length > 0 && player.aiTimer > AI_THROW_COOLDOWN) {
+            } else if (gameStarted && player.hasBall && enemies.length > 0 && player.aiTimer > AI_THROW_COOLDOWN) {
               player.aiState = 'attack';
               const target = enemies[Math.floor(Math.random() * enemies.length)];
               const leadTime = distance(player.position, target.position) / THROW_FORCE;
@@ -558,6 +573,30 @@ export default function Index() {
         ctx.shadowBlur = 0;
       });
 
+      if (!gameStarted && countdown !== null) {
+        ctx.save();
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+        ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+        
+        ctx.font = 'bold 120px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        
+        const scale = 1 + (1 - (elapsed % 1000) / 1000) * 0.3;
+        ctx.save();
+        ctx.translate(CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2);
+        ctx.scale(scale, scale);
+        
+        ctx.shadowBlur = 30;
+        ctx.shadowColor = '#9b87f5';
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillText(countdown.toString(), 0, 0);
+        ctx.shadowBlur = 0;
+        
+        ctx.restore();
+        ctx.restore();
+      }
+
       animationFrameRef.current = requestAnimationFrame(gameLoop);
     };
 
@@ -614,6 +653,10 @@ export default function Index() {
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
+
+    const elapsed = Date.now() - gameStartTimeRef.current;
+    const gameStarted = elapsed >= 2000;
+    if (!gameStarted) return;
 
     const clickPos = { x: e.clientX - rect.left, y: e.clientY - rect.top };
     const players = playersRef.current;
