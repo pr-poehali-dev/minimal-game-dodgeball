@@ -80,6 +80,25 @@ const AVATAR_COLORS = [
   '#f26522', '#7289da', '#43b581', '#f04747', '#faa81a', '#00d9ff'
 ];
 
+const BOT_AVATARS = [
+  'https://i.pravatar.cc/150?img=1',
+  'https://i.pravatar.cc/150?img=2',
+  'https://i.pravatar.cc/150?img=3',
+  'https://i.pravatar.cc/150?img=4',
+  'https://i.pravatar.cc/150?img=5',
+  'https://i.pravatar.cc/150?img=6',
+  'https://i.pravatar.cc/150?img=7',
+  'https://i.pravatar.cc/150?img=8',
+  'https://i.pravatar.cc/150?img=9',
+  'https://i.pravatar.cc/150?img=10',
+  'https://i.pravatar.cc/150?img=11',
+  'https://i.pravatar.cc/150?img=12',
+  'https://i.pravatar.cc/150?img=13',
+  'https://i.pravatar.cc/150?img=14',
+  'https://i.pravatar.cc/150?img=15',
+  'https://i.pravatar.cc/150?img=16'
+];
+
 export default function Index() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [gameState, setGameState] = useState<GameState>('menu');
@@ -99,6 +118,7 @@ export default function Index() {
   const animationFrameRef = useRef<number>();
   const gameStartTimeRef = useRef<number>(0);
   const [countdown, setCountdown] = useState<number | null>(null);
+  const avatarImagesRef = useRef<Map<string, HTMLImageElement>>(new Map());
 
   const distance = (a: Vector2D, b: Vector2D) => {
     const dx = a.x - b.x;
@@ -109,6 +129,24 @@ export default function Index() {
   const normalize = (v: Vector2D): Vector2D => {
     const len = Math.sqrt(v.x * v.x + v.y * v.y);
     return len > 0 ? { x: v.x / len, y: v.y / len } : { x: 0, y: 0 };
+  };
+
+  const loadAvatarImage = (url: string): Promise<HTMLImageElement> => {
+    return new Promise((resolve, reject) => {
+      if (avatarImagesRef.current.has(url)) {
+        resolve(avatarImagesRef.current.get(url)!);
+        return;
+      }
+      
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        avatarImagesRef.current.set(url, img);
+        resolve(img);
+      };
+      img.onerror = reject;
+      img.src = url;
+    });
   };
 
   const initGame = useCallback((infinite: boolean, size: number) => {
@@ -145,9 +183,13 @@ export default function Index() {
           auraPhase: 0,
           invulnerableUntil: undefined,
           nickname: isPlayerControlled ? playerNickname : BOT_NAMES[Math.floor(Math.random() * BOT_NAMES.length)],
-          avatar: isPlayerControlled ? playerAvatar : AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)],
+          avatar: isPlayerControlled ? (customAvatarUrl || playerAvatar) : BOT_AVATARS[Math.floor(Math.random() * BOT_AVATARS.length)],
         };
         newPlayers.push(player);
+        
+        if (player.avatar.startsWith('http') || player.avatar.startsWith('data:')) {
+          loadAvatarImage(player.avatar).catch(() => {});
+        }
 
         const ball: Ball = {
           id: `ball-${teamColor}-${i}`,
@@ -756,20 +798,48 @@ export default function Index() {
         ctx.save();
         ctx.font = '11px Inter, sans-serif';
         ctx.textAlign = 'center';
-        ctx.textBaseline = 'bottom';
+        ctx.textBaseline = 'middle';
         
-        const nameY = player.position.y - player.radius - 8;
+        const nameY = player.position.y - player.radius - 18;
+        const avatarSize = 18;
+        const padding = 4;
         
-        ctx.fillStyle = 'rgba(30, 31, 34, 0.8)';
-        ctx.fillRect(
-          player.position.x - 30,
-          nameY - 14,
-          60,
-          16
-        );
+        const textMetrics = ctx.measureText(player.nickname);
+        const bgWidth = textMetrics.width + avatarSize + padding * 3;
+        const bgHeight = avatarSize + padding * 2;
+        const bgX = player.position.x - bgWidth / 2;
+        const bgY = nameY - bgHeight / 2;
+        
+        ctx.fillStyle = 'rgba(30, 31, 34, 0.85)';
+        ctx.beginPath();
+        ctx.roundRect(bgX, bgY, bgWidth, bgHeight, 9);
+        ctx.fill();
+        
+        const avatarX = bgX + padding;
+        const avatarY = bgY + padding;
+        
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(avatarX + avatarSize / 2, avatarY + avatarSize / 2, avatarSize / 2, 0, Math.PI * 2);
+        ctx.clip();
+        
+        if (player.avatar.startsWith('http') || player.avatar.startsWith('data:')) {
+          const img = avatarImagesRef.current.get(player.avatar);
+          if (img && img.complete) {
+            ctx.drawImage(img, avatarX, avatarY, avatarSize, avatarSize);
+          } else {
+            ctx.fillStyle = AVATAR_COLORS[0];
+            ctx.fillRect(avatarX, avatarY, avatarSize, avatarSize);
+          }
+        } else {
+          ctx.fillStyle = player.avatar;
+          ctx.fillRect(avatarX, avatarY, avatarSize, avatarSize);
+        }
+        
+        ctx.restore();
         
         ctx.fillStyle = '#dbdee1';
-        ctx.fillText(player.nickname, player.position.x, nameY);
+        ctx.fillText(player.nickname, bgX + avatarSize + padding * 2 + textMetrics.width / 2, nameY);
         
         ctx.restore();
       });
