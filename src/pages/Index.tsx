@@ -69,7 +69,6 @@ export default function Index() {
   const [gameState, setGameState] = useState<GameState>('menu');
   const [infiniteMode, setInfiniteMode] = useState(false);
   const [score, setScore] = useState({ purple: 5, blue: 5 });
-  const [isMouseDown, setIsMouseDown] = useState(false);
   const [mousePosition, setMousePosition] = useState<Vector2D>({ x: 0, y: 0 });
   
   const playersRef = useRef<Player[]>([]);
@@ -207,16 +206,14 @@ export default function Index() {
         }
 
         if (player.isPlayer) {
-          if (isMouseDown) {
-            const dx = mousePosition.x - player.position.x;
-            const dy = mousePosition.y - player.position.y;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-            
-            if (dist > 5) {
-              const dir = { x: dx / dist, y: dy / dist };
-              player.velocity.x += dir.x * PLAYER_ACCELERATION;
-              player.velocity.y += dir.y * PLAYER_ACCELERATION;
-            }
+          const dx = mousePosition.x - player.position.x;
+          const dy = mousePosition.y - player.position.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          
+          if (dist > 5) {
+            const dir = { x: dx / dist, y: dy / dist };
+            player.velocity.x += dir.x * PLAYER_ACCELERATION;
+            player.velocity.y += dir.y * PLAYER_ACCELERATION;
           }
         } else {
           player.aiTimer++;
@@ -619,7 +616,7 @@ export default function Index() {
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [gameState, infiniteMode, isMouseDown, mousePosition]);
+  }, [gameState, infiniteMode, mousePosition]);
 
   const throwBall = (player: Player, target: Vector2D) => {
     const balls = ballsRef.current;
@@ -641,18 +638,6 @@ export default function Index() {
         createParticles(player.position.x + dir.x * 20, player.position.y + dir.y * 20, '#FFFFFF', 6);
       }
     });
-  };
-
-  const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    setIsMouseDown(true);
-    const rect = canvasRef.current?.getBoundingClientRect();
-    if (rect) {
-      setMousePosition({ x: e.clientX - rect.left, y: e.clientY - rect.top });
-    }
-  };
-
-  const handleMouseUp = () => {
-    setIsMouseDown(false);
   };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -706,8 +691,8 @@ export default function Index() {
             </Button>
           </div>
           <div className="mt-12 text-sm text-muted-foreground space-y-2">
-            <p>Зажми ЛКМ для движения</p>
-            <p>Кликни на противника чтобы бросить мяч</p>
+            <p>Двигай мышкой для управления</p>
+            <p>Кликни чтобы бросить мяч</p>
           </div>
         </div>
       </div>
@@ -758,8 +743,6 @@ export default function Index() {
         width={CANVAS_WIDTH}
         height={CANVAS_HEIGHT}
         className="absolute top-0 left-0 cursor-crosshair"
-        onMouseDown={handleMouseDown}
-        onMouseUp={handleMouseUp}
         onMouseMove={handleMouseMove}
         onClick={handleCanvasClick}
       />
