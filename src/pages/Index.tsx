@@ -827,12 +827,12 @@ export default function Index() {
       <div className="w-screen h-screen flex items-center justify-center bg-[#2b2d31]">
         <div className="text-center max-w-md mx-auto px-6 py-8 animate-fade-in">
           <div className="mb-8">
-            <h1 className="text-5xl font-extrabold text-white mb-3 tracking-tight">ВЫШИБАЛЫ</h1>
-            <p className="text-sm text-[#b5bac1]">Классическая игра в додж-бол</p>
+            <h1 className="text-5xl font-extrabold text-white mb-3 tracking-tight">DODGEBALL</h1>
+            <p className="text-sm text-[#b5bac1]">Classic ball-throwing action</p>
           </div>
           
           <div className="bg-[#1e1f22] rounded-lg p-6 mb-4">
-            <p className="text-xs font-semibold text-[#b5bac1] uppercase tracking-wide mb-3">Размер команды</p>
+            <p className="text-xs font-semibold text-[#b5bac1] uppercase tracking-wide mb-3">Team Size</p>
             <div className="flex gap-2 justify-center mb-6">
               {[1, 2, 3, 4, 5].map(size => (
                 <button
@@ -855,21 +855,21 @@ export default function Index() {
                 className="w-full bg-[#5865f2] hover:bg-[#4752c4] text-white font-semibold h-11 rounded-md"
                 onClick={() => initGame(false, teamSize)}
               >
-                Начать игру
+                Start Game
               </Button>
               <Button
                 size="lg"
                 className="w-full bg-[#2b2d31] hover:bg-[#35373c] text-white font-semibold h-11 rounded-md"
                 onClick={() => initGame(true, teamSize)}
               >
-                Бесконечный режим
+                Infinite Mode
               </Button>
             </div>
           </div>
           
           <div className="text-xs text-[#80848e] space-y-1">
-            <p>• Двигай мышкой для управления персонажем</p>
-            <p>• Кликни чтобы бросить мяч</p>
+            <p>• Move your mouse to control</p>
+            <p>• Click to throw the ball</p>
           </div>
         </div>
       </div>
@@ -895,7 +895,7 @@ export default function Index() {
               />
             </div>
             <h1 className="text-4xl font-extrabold text-white mb-2">
-              {playerWon ? 'ПОБЕДА!' : 'ПОРАЖЕНИЕ'}
+              {playerWon ? 'VICTORY!' : 'DEFEAT'}
             </h1>
             <div className="flex items-center justify-center gap-4 text-xl font-bold text-[#b5bac1]">
               <div className="flex items-center gap-2">
@@ -917,14 +917,14 @@ export default function Index() {
               onClick={() => initGame(infiniteMode, teamSize)}
             >
               <Icon name="RotateCcw" className="mr-2" size={18} />
-              Играть ещё раз
+              Play Again
             </Button>
             <Button
               size="lg"
               className="w-full bg-[#2b2d31] hover:bg-[#35373c] text-[#b5bac1] font-semibold h-11 rounded-md"
               onClick={() => setGameState('menu')}
             >
-              Главное меню
+              Main Menu
             </Button>
           </div>
         </div>
