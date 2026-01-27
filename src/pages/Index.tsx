@@ -13,7 +13,8 @@ type Player = {
   isAlive: boolean;
   isPlayer: boolean;
   hasBall: boolean;
-  targetPosition?: Vector2D;
+  aiState: 'idle' | 'chase' | 'attack' | 'evade';
+  aiTimer: number;
   respawnTime?: number;
 };
 
@@ -33,23 +34,38 @@ const CANVAS_WIDTH = window.innerWidth;
 const CANVAS_HEIGHT = window.innerHeight;
 const PLAYER_RADIUS = 20;
 const BALL_RADIUS = 8;
-const PLAYER_SPEED = 5;
-const BALL_DAMPING = 0.98;
-const BALL_BOUNCE = 0.7;
-const THROW_FORCE = 15;
-const RESPAWN_TIME = 10000;
-const PLAYER_ACCELERATION = 0.15;
+const PLAYER_MAX_SPEED = 4;
+const PLAYER_ACCELERATION = 0.3;
+const FRICTION = 0.88;
+const BALL_FRICTION = 0.97;
+const BALL_BOUNCE = 0.6;
+const THROW_FORCE = 18;
+const GRAVITY = 0.5;
+const RESPAWN_TIME = 5000;
+const BALL_PICKUP_RADIUS = 30;
 
 export default function Index() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [gameState, setGameState] = useState<GameState>('menu');
-  const [players, setPlayers] = useState<Player[]>([]);
-  const [balls, setBalls] = useState<Ball[]>([]);
-  const [isMouseDown, setIsMouseDown] = useState(false);
-  const [mousePosition, setMousePosition] = useState<Vector2D>({ x: 0, y: 0 });
   const [infiniteMode, setInfiniteMode] = useState(false);
   const [score, setScore] = useState({ purple: 5, blue: 5 });
+  const [isMouseDown, setIsMouseDown] = useState(false);
+  const [mousePosition, setMousePosition] = useState<Vector2D>({ x: 0, y: 0 });
+  
+  const playersRef = useRef<Player[]>([]);
+  const ballsRef = useRef<Ball[]>([]);
   const animationFrameRef = useRef<number>();
+
+  const distance = (a: Vector2D, b: Vector2D) => {
+    const dx = a.x - b.x;
+    const dy = a.y - b.y;
+    return Math.sqrt(dx * dx + dy * dy);
+  };
+
+  const normalize = (v: Vector2D): Vector2D => {
+    const len = Math.sqrt(v.x * v.x + v.y * v.y);
+    return len > 0 ? { x: v.x / len, y: v.y / len } : { x: 0, y: 0 };
+  };
 
   const initGame = useCallback((infinite: boolean) => {
     const newPlayers: Player[] = [];
@@ -59,15 +75,15 @@ export default function Index() {
     for (let team = 0; team < 2; team++) {
       const isLeftTeam = team === 0;
       const teamColor = isLeftTeam ? 'purple' : 'blue';
-      const xBase = isLeftTeam ? CANVAS_WIDTH * 0.2 : CANVAS_WIDTH * 0.8;
+      const xBase = isLeftTeam ? CANVAS_WIDTH * 0.25 : CANVAS_WIDTH * 0.75;
 
       for (let i = 0; i < 5; i++) {
         const isPlayerControlled = teamColor === playerTeam && i === 2;
         const player: Player = {
           id: `${teamColor}-${i}`,
           position: {
-            x: xBase + (Math.random() - 0.5) * 100,
-            y: CANVAS_HEIGHT * 0.3 + i * 100,
+            x: xBase + (Math.random() - 0.5) * 80,
+            y: CANVAS_HEIGHT * 0.2 + i * (CANVAS_HEIGHT * 0.6) / 5,
           },
           velocity: { x: 0, y: 0 },
           radius: PLAYER_RADIUS,
@@ -75,6 +91,8 @@ export default function Index() {
           isAlive: true,
           isPlayer: isPlayerControlled,
           hasBall: true,
+          aiState: 'idle',
+          aiTimer: Math.random() * 120,
         };
         newPlayers.push(player);
 
@@ -90,23 +108,12 @@ export default function Index() {
       }
     }
 
-    setPlayers(newPlayers);
-    setBalls(newBalls);
+    playersRef.current = newPlayers;
+    ballsRef.current = newBalls;
     setInfiniteMode(infinite);
     setScore({ purple: 5, blue: 5 });
     setGameState('playing');
   }, []);
-
-  const distance = (a: Vector2D, b: Vector2D) => {
-    const dx = a.x - b.x;
-    const dy = a.y - b.y;
-    return Math.sqrt(dx * dx + dy * dy);
-  };
-
-  const normalize = (v: Vector2D): Vector2D => {
-    const len = Math.sqrt(v.x * v.x + v.y * v.y);
-    return len > 0 ? { x: v.x / len, y: v.y / len } : { x: 0, y: 0 };
-  };
 
   useEffect(() => {
     if (gameState !== 'playing') return;
@@ -118,8 +125,10 @@ export default function Index() {
     if (!ctx) return;
 
     const gameLoop = () => {
-      ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+      const players = playersRef.current;
+      const balls = ballsRef.current;
 
+      ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
       ctx.fillStyle = '#1A1F2C';
       ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
@@ -130,163 +139,214 @@ export default function Index() {
       ctx.lineTo(CANVAS_WIDTH / 2, CANVAS_HEIGHT);
       ctx.stroke();
 
-      const updatedPlayers = players.map((player) => {
+      players.forEach((player) => {
         if (!player.isAlive) {
           if (infiniteMode && player.respawnTime && Date.now() > player.respawnTime) {
-            return {
-              ...player,
-              isAlive: true,
-              hasBall: false,
-              respawnTime: undefined,
-              position: {
-                x: player.team === 'purple' ? CANVAS_WIDTH * 0.2 : CANVAS_WIDTH * 0.8,
-                y: CANVAS_HEIGHT * 0.5,
-              },
+            player.isAlive = true;
+            player.hasBall = false;
+            player.respawnTime = undefined;
+            player.position = {
+              x: player.team === 'purple' ? CANVAS_WIDTH * 0.25 : CANVAS_WIDTH * 0.75,
+              y: CANVAS_HEIGHT * 0.5,
             };
+            player.velocity = { x: 0, y: 0 };
           }
-          return player;
+          return;
         }
 
-        const newPlayer = { ...player };
-
-        if (player.isPlayer && isMouseDown) {
-          const dir = normalize({
-            x: mousePosition.x - player.position.x,
-            y: mousePosition.y - player.position.y,
-          });
-          const targetVelocity = { x: dir.x * PLAYER_SPEED, y: dir.y * PLAYER_SPEED };
-          newPlayer.velocity = {
-            x: player.velocity.x + (targetVelocity.x - player.velocity.x) * PLAYER_ACCELERATION,
-            y: player.velocity.y + (targetVelocity.y - player.velocity.y) * PLAYER_ACCELERATION,
-          };
-        } else if (!player.isPlayer) {
-          const nearestBall = balls
-            .filter((b) => !b.owner || b.owner === player.id)
-            .sort((a, b) => distance(a.position, player.position) - distance(b.position, player.position))[0];
-
-          if (nearestBall && !player.hasBall && distance(nearestBall.position, player.position) > 50) {
-            const dir = normalize({
-              x: nearestBall.position.x - player.position.x,
-              y: nearestBall.position.y - player.position.y,
-            });
-            const targetVelocity = { x: dir.x * PLAYER_SPEED * 0.6, y: dir.y * PLAYER_SPEED * 0.6 };
-            newPlayer.velocity = {
-              x: player.velocity.x + (targetVelocity.x - player.velocity.x) * 0.1,
-              y: player.velocity.y + (targetVelocity.y - player.velocity.y) * 0.1,
-            };
-          } else {
-            newPlayer.velocity = { x: player.velocity.x * 0.85, y: player.velocity.y * 0.85 };
-          }
-
-          if (player.hasBall && Math.random() < 0.02) {
-            const enemies = players.filter((p) => p.team !== player.team && p.isAlive);
-            if (enemies.length > 0) {
-              const target = enemies[Math.floor(Math.random() * enemies.length)];
-              throwBallAt(player, target.position);
+        if (player.isPlayer) {
+          if (isMouseDown) {
+            const dx = mousePosition.x - player.position.x;
+            const dy = mousePosition.y - player.position.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            
+            if (dist > 5) {
+              const dir = { x: dx / dist, y: dy / dist };
+              player.velocity.x += dir.x * PLAYER_ACCELERATION;
+              player.velocity.y += dir.y * PLAYER_ACCELERATION;
             }
           }
         } else {
-          newPlayer.velocity = { x: player.velocity.x * 0.85, y: player.velocity.y * 0.85 };
+          player.aiTimer++;
+
+          if (player.aiTimer > 60) {
+            const enemies = players.filter(p => p.team !== player.team && p.isAlive);
+            const incomingBalls = balls.filter(b => 
+              b.justThrown && 
+              b.thrownBy && 
+              players.find(p => p.id === b.thrownBy)?.team !== player.team &&
+              distance(b.position, player.position) < 200
+            );
+
+            if (incomingBalls.length > 0 && Math.random() < 0.3) {
+              player.aiState = 'evade';
+              const ball = incomingBalls[0];
+              const awayDir = normalize({
+                x: player.position.x - ball.position.x,
+                y: player.position.y - ball.position.y,
+              });
+              player.velocity.x += awayDir.x * PLAYER_ACCELERATION * 1.5;
+              player.velocity.y += awayDir.y * PLAYER_ACCELERATION * 1.5;
+              player.aiTimer = 0;
+            } else if (player.hasBall && enemies.length > 0 && Math.random() < 0.04) {
+              player.aiState = 'attack';
+              const target = enemies[Math.floor(Math.random() * enemies.length)];
+              const leadTime = distance(player.position, target.position) / THROW_FORCE;
+              const predictedPos = {
+                x: target.position.x + target.velocity.x * leadTime * 0.5,
+                y: target.position.y + target.velocity.y * leadTime * 0.5,
+              };
+              throwBall(player, predictedPos);
+              player.aiTimer = 0;
+            } else if (!player.hasBall) {
+              const freeBalls = balls.filter(b => !b.owner && !b.justThrown);
+              if (freeBalls.length > 0) {
+                player.aiState = 'chase';
+                const nearest = freeBalls.reduce((prev, curr) => 
+                  distance(curr.position, player.position) < distance(prev.position, player.position) ? curr : prev
+                );
+                const dir = normalize({
+                  x: nearest.position.x - player.position.x,
+                  y: nearest.position.y - player.position.y,
+                });
+                player.velocity.x += dir.x * PLAYER_ACCELERATION * 0.8;
+                player.velocity.y += dir.y * PLAYER_ACCELERATION * 0.8;
+              } else {
+                player.aiState = 'idle';
+              }
+            } else {
+              player.aiState = 'idle';
+              if (Math.random() < 0.02) {
+                const randomDir = {
+                  x: (Math.random() - 0.5) * 2,
+                  y: (Math.random() - 0.5) * 2,
+                };
+                player.velocity.x += randomDir.x * PLAYER_ACCELERATION * 0.3;
+                player.velocity.y += randomDir.y * PLAYER_ACCELERATION * 0.3;
+              }
+            }
+          }
         }
 
-        newPlayer.position = {
-          x: Math.max(
-            player.radius,
-            Math.min(
-              player.team === 'purple' ? CANVAS_WIDTH / 2 - player.radius : CANVAS_WIDTH / 2 + player.radius,
-              player.position.x + newPlayer.velocity.x
-            )
-          ),
-          y: Math.max(player.radius, Math.min(CANVAS_HEIGHT - player.radius, player.position.y + newPlayer.velocity.y)),
-        };
+        const speed = Math.sqrt(player.velocity.x ** 2 + player.velocity.y ** 2);
+        if (speed > PLAYER_MAX_SPEED) {
+          player.velocity.x = (player.velocity.x / speed) * PLAYER_MAX_SPEED;
+          player.velocity.y = (player.velocity.y / speed) * PLAYER_MAX_SPEED;
+        }
 
-        return newPlayer;
+        player.velocity.x *= FRICTION;
+        player.velocity.y *= FRICTION;
+
+        player.position.x += player.velocity.x;
+        player.position.y += player.velocity.y;
+
+        const halfWidth = CANVAS_WIDTH / 2;
+        const minX = player.team === 'purple' ? player.radius : halfWidth + player.radius;
+        const maxX = player.team === 'purple' ? halfWidth - player.radius : CANVAS_WIDTH - player.radius;
+
+        if (player.position.x < minX) {
+          player.position.x = minX;
+          player.velocity.x *= -0.5;
+        }
+        if (player.position.x > maxX) {
+          player.position.x = maxX;
+          player.velocity.x *= -0.5;
+        }
+        if (player.position.y < player.radius) {
+          player.position.y = player.radius;
+          player.velocity.y *= -0.5;
+        }
+        if (player.position.y > CANVAS_HEIGHT - player.radius) {
+          player.position.y = CANVAS_HEIGHT - player.radius;
+          player.velocity.y *= -0.5;
+        }
       });
 
-      const updatedBalls = balls.map((ball) => {
-        const newBall = { ...ball };
-
+      balls.forEach((ball) => {
         if (ball.owner) {
-          const owner = updatedPlayers.find((p) => p.id === ball.owner);
+          const owner = players.find(p => p.id === ball.owner);
           if (owner && owner.isAlive) {
-            newBall.position = { ...owner.position };
-            newBall.velocity = { x: 0, y: 0 };
+            ball.position.x = owner.position.x;
+            ball.position.y = owner.position.y;
+            ball.velocity = { x: 0, y: 0 };
           } else {
-            newBall.owner = undefined;
+            ball.owner = undefined;
           }
         } else {
-          newBall.position = {
-            x: ball.position.x + ball.velocity.x,
-            y: ball.position.y + ball.velocity.y,
-          };
+          ball.velocity.y += GRAVITY * 0.3;
+          ball.velocity.x *= BALL_FRICTION;
+          ball.velocity.y *= BALL_FRICTION;
 
-          if (newBall.position.x - ball.radius < 0 || newBall.position.x + ball.radius > CANVAS_WIDTH) {
-            newBall.velocity.x *= -BALL_BOUNCE;
-            newBall.position.x = Math.max(ball.radius, Math.min(CANVAS_WIDTH - ball.radius, newBall.position.x));
-            newBall.justThrown = false;
+          ball.position.x += ball.velocity.x;
+          ball.position.y += ball.velocity.y;
+
+          if (ball.position.x - ball.radius < 0) {
+            ball.position.x = ball.radius;
+            ball.velocity.x *= -BALL_BOUNCE;
+            ball.justThrown = false;
+          }
+          if (ball.position.x + ball.radius > CANVAS_WIDTH) {
+            ball.position.x = CANVAS_WIDTH - ball.radius;
+            ball.velocity.x *= -BALL_BOUNCE;
+            ball.justThrown = false;
+          }
+          if (ball.position.y - ball.radius < 0) {
+            ball.position.y = ball.radius;
+            ball.velocity.y *= -BALL_BOUNCE;
+            ball.justThrown = false;
+          }
+          if (ball.position.y + ball.radius > CANVAS_HEIGHT) {
+            ball.position.y = CANVAS_HEIGHT - ball.radius;
+            ball.velocity.y *= -BALL_BOUNCE;
+            ball.justThrown = false;
           }
 
-          if (newBall.position.y - ball.radius < 0 || newBall.position.y + ball.radius > CANVAS_HEIGHT) {
-            newBall.velocity.y *= -BALL_BOUNCE;
-            newBall.position.y = Math.max(ball.radius, Math.min(CANVAS_HEIGHT - ball.radius, newBall.position.y));
-            newBall.justThrown = false;
+          const speed = Math.sqrt(ball.velocity.x ** 2 + ball.velocity.y ** 2);
+          if (speed < 0.5) {
+            ball.velocity = { x: 0, y: 0 };
+            ball.justThrown = false;
           }
 
-          newBall.velocity = {
-            x: ball.velocity.x * BALL_DAMPING,
-            y: ball.velocity.y * BALL_DAMPING,
-          };
+          players.forEach((player) => {
+            if (!player.isAlive) return;
 
-          if (Math.abs(newBall.velocity.x) < 0.1 && Math.abs(newBall.velocity.y) < 0.1) {
-            newBall.velocity = { x: 0, y: 0 };
-          }
-        }
-
-        updatedPlayers.forEach((player) => {
-          if (!player.isAlive) return;
-
-          const dist = distance(newBall.position, player.position);
-          if (dist < ball.radius + player.radius) {
-            if (newBall.justThrown && newBall.thrownBy !== player.id && !newBall.owner) {
-              const thrower = updatedPlayers.find((p) => p.id === newBall.thrownBy);
-              if (thrower && thrower.team !== player.team) {
+            const dist = distance(ball.position, player.position);
+            
+            if (ball.justThrown && ball.thrownBy !== player.id) {
+              const thrower = players.find(p => p.id === ball.thrownBy);
+              if (thrower && thrower.team !== player.team && dist < ball.radius + player.radius) {
                 player.isAlive = false;
                 player.respawnTime = infiniteMode ? Date.now() + RESPAWN_TIME : undefined;
-                newBall.justThrown = false;
-                newBall.thrownBy = undefined;
+                ball.justThrown = false;
+                ball.thrownBy = undefined;
               }
-            } else if (!newBall.justThrown && !player.hasBall && !newBall.owner) {
-              newBall.owner = player.id;
+            } else if (!ball.justThrown && !ball.owner && !player.hasBall && dist < BALL_PICKUP_RADIUS) {
+              ball.owner = player.id;
               player.hasBall = true;
             }
-          }
-        });
-
-        return newBall;
+          });
+        }
       });
 
-      setPlayers(updatedPlayers);
-      setBalls(updatedBalls);
-
-      const purpleAlive = updatedPlayers.filter((p) => p.team === 'purple' && p.isAlive).length;
-      const blueAlive = updatedPlayers.filter((p) => p.team === 'blue' && p.isAlive).length;
+      const purpleAlive = players.filter(p => p.team === 'purple' && p.isAlive).length;
+      const blueAlive = players.filter(p => p.team === 'blue' && p.isAlive).length;
       setScore({ purple: purpleAlive, blue: blueAlive });
 
       if (!infiniteMode) {
-        const playerAlive = updatedPlayers.find((p) => p.isPlayer)?.isAlive ?? false;
+        const playerAlive = players.find(p => p.isPlayer)?.isAlive ?? false;
         if (purpleAlive === 0 || blueAlive === 0 || !playerAlive) {
           setGameState('results');
           return;
         }
       } else {
-        const playerAlive = updatedPlayers.find((p) => p.isPlayer)?.isAlive ?? false;
+        const playerAlive = players.find(p => p.isPlayer)?.isAlive ?? false;
         if (!playerAlive) {
           setGameState('results');
           return;
         }
       }
 
-      updatedPlayers.forEach((player) => {
+      players.forEach((player) => {
         if (!player.isAlive) return;
 
         ctx.shadowBlur = 15;
@@ -306,12 +366,12 @@ export default function Index() {
         }
       });
 
-      updatedBalls.forEach((ball) => {
+      balls.forEach((ball) => {
         if (ball.owner) return;
 
         ctx.shadowBlur = 10;
-        ctx.shadowColor = '#FFFFFF';
-        ctx.fillStyle = '#FFFFFF';
+        ctx.shadowColor = ball.justThrown ? '#FF6B6B' : '#FFFFFF';
+        ctx.fillStyle = ball.justThrown ? '#FF6B6B' : '#FFFFFF';
         ctx.beginPath();
         ctx.arc(ball.position.x, ball.position.y, ball.radius, 0, Math.PI * 2);
         ctx.fill();
@@ -328,31 +388,27 @@ export default function Index() {
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [gameState, players, balls, isMouseDown, mousePosition, infiniteMode]);
+  }, [gameState, infiniteMode, isMouseDown, mousePosition]);
 
-  const throwBallAt = (player: Player, target: Vector2D) => {
-    setBalls((prevBalls) =>
-      prevBalls.map((ball) => {
-        if (ball.owner === player.id) {
-          const dir = normalize({
-            x: target.x - player.position.x,
-            y: target.y - player.position.y,
-          });
-          return {
-            ...ball,
-            owner: undefined,
-            velocity: { x: dir.x * THROW_FORCE, y: dir.y * THROW_FORCE },
-            justThrown: true,
-            thrownBy: player.id,
-          };
-        }
-        return ball;
-      })
-    );
+  const throwBall = (player: Player, target: Vector2D) => {
+    const balls = ballsRef.current;
+    balls.forEach((ball) => {
+      if (ball.owner === player.id) {
+        const dir = normalize({
+          x: target.x - player.position.x,
+          y: target.y - player.position.y,
+        });
+        ball.owner = undefined;
+        ball.velocity = { x: dir.x * THROW_FORCE, y: dir.y * THROW_FORCE };
+        ball.justThrown = true;
+        ball.thrownBy = player.id;
+        player.hasBall = false;
 
-    setPlayers((prevPlayers) =>
-      prevPlayers.map((p) => (p.id === player.id ? { ...p, hasBall: false } : p))
-    );
+        setTimeout(() => {
+          ball.justThrown = false;
+        }, 300);
+      }
+    });
   };
 
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -379,18 +435,18 @@ export default function Index() {
     if (!rect) return;
 
     const clickPos = { x: e.clientX - rect.left, y: e.clientY - rect.top };
-    const player = players.find((p) => p.isPlayer && p.isAlive);
+    const players = playersRef.current;
+    const player = players.find(p => p.isPlayer && p.isAlive);
     if (!player || !player.hasBall) return;
 
     const clickedPlayer = players.find(
-      (p) =>
-        p.team !== player.team &&
-        p.isAlive &&
-        distance(p.position, clickPos) < p.radius
+      p => p.team !== player.team && p.isAlive && distance(p.position, clickPos) < p.radius + 20
     );
 
     if (clickedPlayer) {
-      throwBallAt(player, clickedPlayer.position);
+      throwBall(player, clickedPlayer.position);
+    } else {
+      throwBall(player, clickPos);
     }
   };
 
@@ -427,7 +483,8 @@ export default function Index() {
   }
 
   if (gameState === 'results') {
-    const player = players.find((p) => p.isPlayer);
+    const players = playersRef.current;
+    const player = players.find(p => p.isPlayer);
     const playerWon = player?.isAlive && score[player.team] > 0;
 
     return (
@@ -463,7 +520,7 @@ export default function Index() {
   }
 
   return (
-    <div className="relative w-screen h-screen overflow-hidden no-select">
+    <div className="relative w-screen h-screen overflow-hidden">
       <canvas
         ref={canvasRef}
         width={CANVAS_WIDTH}
