@@ -25,6 +25,7 @@ type Player = {
   kills: number;
   hasAura: boolean;
   auraPhase: number;
+  invulnerableUntil?: number;
 };
 
 type Ball = {
@@ -51,8 +52,8 @@ type Particle = {
 
 type GameState = 'menu' | 'playing' | 'results';
 
-const CANVAS_WIDTH = Math.min(window.innerWidth * 1.2, 2000);
-const CANVAS_HEIGHT = Math.min(window.innerHeight * 1.2, 1200);
+const CANVAS_WIDTH = window.innerWidth;
+const CANVAS_HEIGHT = window.innerHeight;
 const PLAYER_RADIUS = 20;
 const BALL_RADIUS = 8;
 const PLAYER_MAX_SPEED = 5;
@@ -125,6 +126,7 @@ export default function Index() {
           kills: 0,
           hasAura: false,
           auraPhase: 0,
+          invulnerableUntil: isPlayerControlled ? Date.now() + 3000 : undefined,
         };
         newPlayers.push(player);
 
@@ -471,7 +473,8 @@ export default function Index() {
             
             if (ball.justThrown && ball.thrownBy !== player.id) {
               const thrower = players.find(p => p.id === ball.thrownBy);
-              if (thrower && thrower.team !== player.team && dist < ball.radius + player.radius) {
+              const isInvulnerable = player.invulnerableUntil && Date.now() < player.invulnerableUntil;
+              if (thrower && thrower.team !== player.team && dist < ball.radius + player.radius && !isInvulnerable) {
                 player.isAlive = false;
                 player.hitTime = Date.now();
                 player.deathAnimation = 0;
@@ -633,7 +636,27 @@ export default function Index() {
           ctx.globalAlpha = 1 - flashProgress * 0.5;
         }
 
-        if (player.hasAura) {
+        const isInvulnerable = player.invulnerableUntil && Date.now() < player.invulnerableUntil;
+        
+        if (isInvulnerable) {
+          const pulsePhase = (Date.now() % 500) / 500;
+          const auraSize = player.radius + 20 + Math.sin(pulsePhase * Math.PI * 2) * 8;
+          
+          ctx.save();
+          ctx.translate(player.position.x, player.position.y);
+          
+          const gradient = ctx.createRadialGradient(0, 0, player.radius, 0, 0, auraSize);
+          gradient.addColorStop(0, 'rgba(255, 215, 0, 0)');
+          gradient.addColorStop(0.6, 'rgba(255, 215, 0, 0.5)');
+          gradient.addColorStop(1, 'rgba(255, 215, 0, 0)');
+          
+          ctx.fillStyle = gradient;
+          ctx.beginPath();
+          ctx.arc(0, 0, auraSize, 0, Math.PI * 2);
+          ctx.fill();
+          
+          ctx.restore();
+        } else if (player.hasAura) {
           const auraSize1 = player.radius + 15 + Math.sin(player.auraPhase) * 5;
           const auraSize2 = player.radius + 25 + Math.sin(player.auraPhase + Math.PI) * 5;
           
