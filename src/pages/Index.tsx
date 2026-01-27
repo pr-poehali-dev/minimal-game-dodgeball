@@ -916,7 +916,6 @@ export default function Index() {
               className="w-full bg-[#5865f2] hover:bg-[#4752c4] text-white font-semibold h-11 rounded-md"
               onClick={() => initGame(infiniteMode, teamSize)}
             >
-              <Icon name="RotateCcw" className="mr-2" size={18} />
               Play Again
             </Button>
             <Button
