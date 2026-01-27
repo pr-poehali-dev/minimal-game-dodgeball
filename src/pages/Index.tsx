@@ -71,6 +71,7 @@ export default function Index() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [gameState, setGameState] = useState<GameState>('menu');
   const [infiniteMode, setInfiniteMode] = useState(false);
+  const [teamSize, setTeamSize] = useState(5);
   const [score, setScore] = useState({ purple: 5, blue: 5 });
   const [mousePosition, setMousePosition] = useState<Vector2D>({ x: 0, y: 0 });
   
@@ -92,7 +93,7 @@ export default function Index() {
     return len > 0 ? { x: v.x / len, y: v.y / len } : { x: 0, y: 0 };
   };
 
-  const initGame = useCallback((infinite: boolean) => {
+  const initGame = useCallback((infinite: boolean, size: number) => {
     const newPlayers: Player[] = [];
     const newBalls: Ball[] = [];
     const playerTeam = Math.random() > 0.5 ? 'purple' : 'blue';
@@ -102,13 +103,13 @@ export default function Index() {
       const teamColor = isLeftTeam ? 'purple' : 'blue';
       const xBase = isLeftTeam ? CANVAS_WIDTH * 0.25 : CANVAS_WIDTH * 0.75;
 
-      for (let i = 0; i < 5; i++) {
+      for (let i = 0; i < size; i++) {
         const isPlayerControlled = teamColor === playerTeam && i === 2;
         const player: Player = {
           id: `${teamColor}-${i}`,
           position: {
             x: xBase + (Math.random() - 0.5) * 80,
-            y: CANVAS_HEIGHT * 0.2 + i * (CANVAS_HEIGHT * 0.6) / 5,
+            y: CANVAS_HEIGHT * 0.2 + i * (CANVAS_HEIGHT * 0.6) / size,
           },
           velocity: { x: 0, y: 0 },
           radius: PLAYER_RADIUS,
@@ -145,7 +146,7 @@ export default function Index() {
     particlesRef.current = [];
     gameStartTimeRef.current = Date.now();
     setInfiniteMode(infinite);
-    setScore({ purple: 5, blue: 5 });
+    setScore({ purple: size, blue: size });
     setCountdown(null);
     setGameState('playing');
   }, []);
@@ -791,7 +792,7 @@ export default function Index() {
             <Button
               size="lg"
               className="text-lg px-12 py-6 bg-primary hover:bg-primary/90"
-              onClick={() => initGame(false)}
+              onClick={() => initGame(false, teamSize)}
             >
               Начать игру
             </Button>
@@ -799,12 +800,30 @@ export default function Index() {
               size="lg"
               variant="outline"
               className="text-lg px-12 py-6"
-              onClick={() => initGame(true)}
+              onClick={() => initGame(true, teamSize)}
             >
               Бесконечный режим
             </Button>
           </div>
-          <div className="mt-12 text-sm text-muted-foreground space-y-2">
+          <div className="mt-8">
+            <p className="text-sm text-muted-foreground mb-3">Размер команды</p>
+            <div className="flex gap-2 justify-center">
+              {[1, 2, 3, 4, 5].map(size => (
+                <button
+                  key={size}
+                  onClick={() => setTeamSize(size)}
+                  className={`w-10 h-10 rounded-lg transition-all ${
+                    teamSize === size
+                      ? 'bg-primary text-primary-foreground scale-110 shadow-lg'
+                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                  }`}
+                >
+                  {size}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="mt-8 text-sm text-muted-foreground space-y-2">
             <p>Двигай мышкой для управления</p>
             <p>Кликни чтобы бросить мяч</p>
           </div>
@@ -827,19 +846,18 @@ export default function Index() {
           <p className="text-2xl text-muted-foreground">
             Счёт: {score.purple} - {score.blue}
           </p>
-          <div className="flex gap-4 mt-12">
+          <div className="flex flex-col items-center gap-3 mt-12">
             <Button
               size="lg"
-              className="text-lg px-12 py-6 bg-primary hover:bg-primary/90"
-              onClick={() => initGame(infiniteMode)}
+              className="text-xl px-16 py-7 bg-primary hover:bg-primary/90"
+              onClick={() => initGame(infiniteMode, teamSize)}
             >
-              <Icon name="RotateCcw" className="mr-2" />
+              <Icon name="RotateCcw" className="mr-2" size={24} />
               Заново
             </Button>
             <Button
-              size="lg"
-              variant="outline"
-              className="text-lg px-12 py-6"
+              variant="ghost"
+              className="text-sm text-muted-foreground hover:text-foreground"
               onClick={() => setGameState('menu')}
             >
               В меню
