@@ -482,6 +482,58 @@ export default function Index() {
         }
       });
 
+      balls.forEach((ball1, i) => {
+        if (ball1.owner) return;
+        
+        for (let j = i + 1; j < balls.length; j++) {
+          const ball2 = balls[j];
+          if (ball2.owner) continue;
+          
+          const dx = ball2.position.x - ball1.position.x;
+          const dy = ball2.position.y - ball1.position.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          const minDist = ball1.radius + ball2.radius;
+          
+          if (dist < minDist && dist > 0) {
+            const nx = dx / dist;
+            const ny = dy / dist;
+            
+            const overlap = minDist - dist;
+            ball1.position.x -= nx * overlap * 0.5;
+            ball1.position.y -= ny * overlap * 0.5;
+            ball2.position.x += nx * overlap * 0.5;
+            ball2.position.y += ny * overlap * 0.5;
+            
+            const relativeVelocity = {
+              x: ball1.velocity.x - ball2.velocity.x,
+              y: ball1.velocity.y - ball2.velocity.y,
+            };
+            
+            const velocityAlongNormal = relativeVelocity.x * nx + relativeVelocity.y * ny;
+            
+            if (velocityAlongNormal > 0) {
+              const restitution = 0.8;
+              const impulse = (1 + restitution) * velocityAlongNormal / 2;
+              
+              ball1.velocity.x -= impulse * nx;
+              ball1.velocity.y -= impulse * ny;
+              ball2.velocity.x += impulse * nx;
+              ball2.velocity.y += impulse * ny;
+              
+              const impactSpeed = Math.abs(velocityAlongNormal);
+              if (impactSpeed > 3) {
+                createParticles(
+                  (ball1.position.x + ball2.position.x) / 2,
+                  (ball1.position.y + ball2.position.y) / 2,
+                  '#FFFFFF',
+                  Math.floor(impactSpeed / 2)
+                );
+              }
+            }
+          }
+        }
+      });
+
       const purpleAlive = players.filter(p => p.team === 'purple' && p.isAlive).length;
       const blueAlive = players.filter(p => p.team === 'blue' && p.isAlive).length;
       setScore({ purple: purpleAlive, blue: blueAlive });
