@@ -16,6 +16,8 @@ type Player = {
   aiState: 'idle' | 'chase' | 'attack' | 'evade';
   aiTimer: number;
   respawnTime?: number;
+  hitTime?: number;
+  deathAnimation?: number;
 };
 
 type Ball = {
@@ -26,6 +28,17 @@ type Ball = {
   justThrown: boolean;
   thrownBy?: string;
   owner?: string;
+};
+
+type Particle = {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  life: number;
+  maxLife: number;
+  color: string;
+  size: number;
 };
 
 type GameState = 'menu' | 'playing' | 'results';
@@ -54,6 +67,7 @@ export default function Index() {
   
   const playersRef = useRef<Player[]>([]);
   const ballsRef = useRef<Ball[]>([]);
+  const particlesRef = useRef<Particle[]>([]);
   const animationFrameRef = useRef<number>();
 
   const distance = (a: Vector2D, b: Vector2D) => {
@@ -110,10 +124,29 @@ export default function Index() {
 
     playersRef.current = newPlayers;
     ballsRef.current = newBalls;
+    particlesRef.current = [];
     setInfiniteMode(infinite);
     setScore({ purple: 5, blue: 5 });
     setGameState('playing');
   }, []);
+
+  const createParticles = (x: number, y: number, color: string, count: number) => {
+    const particles = particlesRef.current;
+    for (let i = 0; i < count; i++) {
+      const angle = (Math.PI * 2 * i) / count + Math.random() * 0.5;
+      const speed = 2 + Math.random() * 4;
+      particles.push({
+        x,
+        y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        life: 60,
+        maxLife: 60,
+        color,
+        size: 3 + Math.random() * 3,
+      });
+    }
+  };
 
   useEffect(() => {
     if (gameState !== 'playing') return;
@@ -276,31 +309,32 @@ export default function Index() {
           ball.velocity.x *= BALL_FRICTION;
           ball.velocity.y *= BALL_FRICTION;
 
-          const prevX = ball.position.x;
           ball.position.x += ball.velocity.x;
           ball.position.y += ball.velocity.y;
-
-          const halfWidth = CANVAS_WIDTH / 2;
-          if ((prevX < halfWidth && ball.position.x >= halfWidth) || 
-              (prevX > halfWidth && ball.position.x <= halfWidth)) {
-            ball.justThrown = false;
-          }
 
           if (ball.position.x - ball.radius < 0) {
             ball.position.x = ball.radius;
             ball.velocity.x *= -BALL_BOUNCE;
+            ball.justThrown = false;
+            createParticles(ball.position.x, ball.position.y, '#FFFFFF', 8);
           }
           if (ball.position.x + ball.radius > CANVAS_WIDTH) {
             ball.position.x = CANVAS_WIDTH - ball.radius;
             ball.velocity.x *= -BALL_BOUNCE;
+            ball.justThrown = false;
+            createParticles(ball.position.x, ball.position.y, '#FFFFFF', 8);
           }
           if (ball.position.y - ball.radius < 0) {
             ball.position.y = ball.radius;
             ball.velocity.y *= -BALL_BOUNCE;
+            ball.justThrown = false;
+            createParticles(ball.position.x, ball.position.y, '#FFFFFF', 8);
           }
           if (ball.position.y + ball.radius > CANVAS_HEIGHT) {
             ball.position.y = CANVAS_HEIGHT - ball.radius;
             ball.velocity.y *= -BALL_BOUNCE;
+            ball.justThrown = false;
+            createParticles(ball.position.x, ball.position.y, '#FFFFFF', 8);
           }
 
           const speed = Math.sqrt(ball.velocity.x ** 2 + ball.velocity.y ** 2);
@@ -318,11 +352,34 @@ export default function Index() {
               const thrower = players.find(p => p.id === ball.thrownBy);
               if (thrower && thrower.team !== player.team && dist < ball.radius + player.radius) {
                 player.isAlive = false;
+                player.hitTime = Date.now();
+                player.deathAnimation = 0;
                 player.respawnTime = infiniteMode ? Date.now() + RESPAWN_TIME : undefined;
+                
+                const hitColor = player.team === 'purple' ? '#9b87f5' : '#0EA5E9';
+                createParticles(player.position.x, player.position.y, hitColor, 20);
+                createParticles(ball.position.x, ball.position.y, '#FF6B6B', 10);
+                
+                const dx = ball.position.x - player.position.x;
+                const dy = ball.position.y - player.position.y;
+                const collisionDist = Math.sqrt(dx * dx + dy * dy);
+                const nx = dx / collisionDist;
+                const ny = dy / collisionDist;
+                
+                const relativeVelocity = {
+                  x: ball.velocity.x - player.velocity.x,
+                  y: ball.velocity.y - player.velocity.y,
+                };
+                
+                const velocityAlongNormal = relativeVelocity.x * nx + relativeVelocity.y * ny;
+                
+                ball.velocity.x = ball.velocity.x - 2 * velocityAlongNormal * nx;
+                ball.velocity.y = ball.velocity.y - 2 * velocityAlongNormal * ny;
+                ball.velocity.x *= BALL_BOUNCE;
+                ball.velocity.y *= BALL_BOUNCE;
+                
                 ball.justThrown = false;
                 ball.thrownBy = undefined;
-                ball.velocity.x *= 0.3;
-                ball.velocity.y *= 0.3;
               }
             } else if (!ball.justThrown && !ball.owner && !player.hasBall && dist < BALL_PICKUP_RADIUS) {
               ball.owner = player.id;
@@ -350,8 +407,53 @@ export default function Index() {
         }
       }
 
+      const particles = particlesRef.current;
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vx *= 0.95;
+        p.vy *= 0.95;
+        p.life--;
+
+        if (p.life <= 0) {
+          particles.splice(i, 1);
+        } else {
+          const alpha = p.life / p.maxLife;
+          ctx.globalAlpha = alpha;
+          ctx.fillStyle = p.color;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.size * alpha, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+      ctx.globalAlpha = 1;
+
       players.forEach((player) => {
-        if (!player.isAlive) return;
+        if (!player.isAlive) {
+          if (player.deathAnimation !== undefined && player.deathAnimation < 30) {
+            player.deathAnimation++;
+            const progress = player.deathAnimation / 30;
+            const scale = 1 - progress;
+            const alpha = 1 - progress;
+            
+            ctx.globalAlpha = alpha;
+            ctx.shadowBlur = 20 * (1 - progress);
+            ctx.shadowColor = player.team === 'purple' ? '#9b87f5' : '#0EA5E9';
+            ctx.fillStyle = player.team === 'purple' ? '#9b87f5' : '#0EA5E9';
+            ctx.beginPath();
+            ctx.arc(player.position.x, player.position.y, player.radius * scale, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+            ctx.globalAlpha = 1;
+          }
+          return;
+        }
+
+        if (player.hitTime && Date.now() - player.hitTime < 200) {
+          const flashProgress = (Date.now() - player.hitTime) / 200;
+          ctx.globalAlpha = 1 - flashProgress * 0.5;
+        }
 
         ctx.shadowBlur = 15;
         ctx.shadowColor = player.team === 'purple' ? '#9b87f5' : '#0EA5E9';
@@ -360,6 +462,7 @@ export default function Index() {
         ctx.arc(player.position.x, player.position.y, player.radius, 0, Math.PI * 2);
         ctx.fill();
         ctx.shadowBlur = 0;
+        ctx.globalAlpha = 1;
 
         if (player.isPlayer) {
           ctx.strokeStyle = '#FFFFFF';
