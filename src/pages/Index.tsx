@@ -8,6 +8,8 @@ type Player = {
   id: string;
   position: Vector2D;
   velocity: Vector2D;
+  acceleration: Vector2D;
+  targetVelocity: Vector2D;
   radius: number;
   team: 'purple' | 'blue';
   isAlive: boolean;
@@ -29,6 +31,7 @@ type Player = {
   nickname: string;
   avatar: string;
   trail: Array<{ x: number; y: number; alpha: number }>;
+  movementPhase: number;
 };
 
 type Ball = {
@@ -60,8 +63,9 @@ const CANVAS_HEIGHT = window.innerHeight;
 const PLAYER_RADIUS = 20;
 const BALL_RADIUS = 8;
 const PLAYER_MAX_SPEED = 5;
-const PLAYER_ACCELERATION = 0.25;
-const FRICTION = 0.92;
+const PLAYER_ACCELERATION = 0.4;
+const FRICTION = 0.88;
+const MOVEMENT_SMOOTHING = 0.15;
 const BALL_FRICTION = 0.985;
 const BALL_BOUNCE = 0.7;
 const THROW_FORCE = 18;
@@ -183,6 +187,8 @@ export default function Index() {
             y: CANVAS_HEIGHT * 0.2 + i * (CANVAS_HEIGHT * 0.6) / size,
           },
           velocity: { x: 0, y: 0 },
+          acceleration: { x: 0, y: 0 },
+          targetVelocity: { x: 0, y: 0 },
           radius: PLAYER_RADIUS,
           team: teamColor,
           isAlive: true,
@@ -200,6 +206,7 @@ export default function Index() {
           nickname: isPlayerControlled ? playerNickname : BOT_NAMES[Math.floor(Math.random() * BOT_NAMES.length)],
           avatar: isPlayerControlled ? (customAvatarUrl || playerAvatar) : BOT_AVATARS[Math.floor(Math.random() * BOT_AVATARS.length)],
           trail: [],
+          movementPhase: 0,
         };
         newPlayers.push(player);
         
@@ -337,8 +344,11 @@ export default function Index() {
           
           if (dist > 5) {
             const dir = { x: dx / dist, y: dy / dist };
-            player.velocity.x += dir.x * PLAYER_ACCELERATION;
-            player.velocity.y += dir.y * PLAYER_ACCELERATION;
+            player.targetVelocity.x = dir.x * PLAYER_MAX_SPEED;
+            player.targetVelocity.y = dir.y * PLAYER_MAX_SPEED;
+          } else {
+            player.targetVelocity.x = 0;
+            player.targetVelocity.y = 0;
           }
         } else {
           player.aiTimer++;
@@ -445,6 +455,20 @@ export default function Index() {
           }
         }
 
+        const easeOut = (t: number) => 1 - Math.pow(1 - t, 3);
+        const easeIn = (t: number) => t * t * t;
+        
+        const velocityDiff = {
+          x: player.targetVelocity.x - player.velocity.x,
+          y: player.targetVelocity.y - player.velocity.y
+        };
+        
+        const isAccelerating = Math.sqrt(velocityDiff.x ** 2 + velocityDiff.y ** 2) > 0.1;
+        const easingFactor = isAccelerating ? easeIn(MOVEMENT_SMOOTHING) : easeOut(MOVEMENT_SMOOTHING);
+        
+        player.velocity.x += velocityDiff.x * easingFactor;
+        player.velocity.y += velocityDiff.y * easingFactor;
+
         const speed = Math.sqrt(player.velocity.x ** 2 + player.velocity.y ** 2);
         const maxSpeed = player.hasAura ? PLAYER_MAX_SPEED * 1.2 : PLAYER_MAX_SPEED;
         if (speed > maxSpeed) {
@@ -474,13 +498,16 @@ export default function Index() {
         if (speed > 0.5) {
           player.rotation += speed * 0.05;
         }
-
-        if (player.scale > 1) {
-          player.scale -= 0.02;
-          if (player.scale < 1) player.scale = 1;
-        } else if (player.scale < 1) {
-          player.scale += 0.02;
-          if (player.scale > 1) player.scale = 1;
+        
+        if (speed > 0.5) {
+          player.movementPhase += speed * 0.1;
+          const bounce = Math.sin(player.movementPhase) * 0.03;
+          player.scale = 1 + bounce;
+        } else {
+          if (player.scale > 1) {
+            player.scale -= 0.02;
+            if (player.scale < 1) player.scale = 1;
+          }
         }
 
         if (player.throwAnimation !== undefined) {
@@ -488,6 +515,8 @@ export default function Index() {
           if (player.throwAnimation <= 0) {
             player.throwAnimation = undefined;
           }
+          const throwBounce = 1.3 - (player.throwAnimation / 20) * 0.3;
+          player.scale = throwBounce;
         }
 
         const halfWidth = CANVAS_WIDTH / 2;
