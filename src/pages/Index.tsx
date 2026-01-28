@@ -65,7 +65,9 @@ const CANVAS_HEIGHT = window.innerHeight;
 const PLAYER_RADIUS = 20;
 const BALL_RADIUS = 8;
 const PLAYER_MAX_SPEED = 6;
+const BOT_MAX_SPEED = 6;
 const PLAYER_ACCELERATION = 0.35;
+const BOT_ACCELERATION = 0.35;
 const FRICTION = 0.9;
 const MOVEMENT_SMOOTHING = 0.25;
 const BALL_FRICTION = 0.985;
@@ -380,8 +382,8 @@ export default function Index() {
               const perpDir = { x: -awayDir.y, y: awayDir.x };
               const dodgeChoice = Math.random() > 0.5 ? 1 : -1;
               
-              player.velocity.x += (awayDir.x * 0.7 + perpDir.x * dodgeChoice * 0.3) * PLAYER_ACCELERATION * 2.2;
-              player.velocity.y += (awayDir.y * 0.7 + perpDir.y * dodgeChoice * 0.3) * PLAYER_ACCELERATION * 2.2;
+              player.velocity.x += (awayDir.x * 0.7 + perpDir.x * dodgeChoice * 0.3) * BOT_ACCELERATION * 2.2;
+              player.velocity.y += (awayDir.y * 0.7 + perpDir.y * dodgeChoice * 0.3) * BOT_ACCELERATION * 2.2;
               player.aiTimer = 0;
             } else if (!player.hasBall) {
               const freeBalls = balls.filter(b => !b.owner && !b.justThrown);
@@ -394,8 +396,8 @@ export default function Index() {
                   x: nearest.position.x - player.position.x,
                   y: nearest.position.y - player.position.y,
                 });
-                player.velocity.x += dir.x * PLAYER_ACCELERATION * 1.2;
-                player.velocity.y += dir.y * PLAYER_ACCELERATION * 1.2;
+                player.velocity.x += dir.x * BOT_ACCELERATION * 1.2;
+                player.velocity.y += dir.y * BOT_ACCELERATION * 1.2;
               } else {
                 player.aiState = 'idle';
                 if (Math.random() < 0.015) {
@@ -403,8 +405,8 @@ export default function Index() {
                     x: (Math.random() - 0.5) * 2,
                     y: (Math.random() - 0.5) * 2,
                   };
-                  player.velocity.x += randomDir.x * PLAYER_ACCELERATION * 0.4;
-                  player.velocity.y += randomDir.y * PLAYER_ACCELERATION * 0.4;
+                  player.velocity.x += randomDir.x * BOT_ACCELERATION * 0.4;
+                  player.velocity.y += randomDir.y * BOT_ACCELERATION * 0.4;
                 }
               }
             } else if (player.hasBall && enemies.length > 0) {
@@ -434,22 +436,22 @@ export default function Index() {
                       x: closestEnemy.position.x - player.position.x,
                       y: closestEnemy.position.y - player.position.y,
                     });
-                    player.velocity.x += dir.x * PLAYER_ACCELERATION * 0.5;
-                    player.velocity.y += dir.y * PLAYER_ACCELERATION * 0.5;
+                    player.velocity.x += dir.x * BOT_ACCELERATION * 0.5;
+                    player.velocity.y += dir.y * BOT_ACCELERATION * 0.5;
                   } else if (moveChoice < 0.6) {
                     const awayDir = {
                       x: player.team === 'purple' ? -1 : 1,
                       y: (Math.random() - 0.5) * 2,
                     };
-                    player.velocity.x += awayDir.x * PLAYER_ACCELERATION * 0.3;
-                    player.velocity.y += awayDir.y * PLAYER_ACCELERATION * 0.3;
+                    player.velocity.x += awayDir.x * BOT_ACCELERATION * 0.3;
+                    player.velocity.y += awayDir.y * BOT_ACCELERATION * 0.3;
                   } else {
                     const randomDir = {
                       x: (Math.random() - 0.5) * 2,
                       y: (Math.random() - 0.5) * 2,
                     };
-                    player.velocity.x += randomDir.x * PLAYER_ACCELERATION * 0.3;
-                    player.velocity.y += randomDir.y * PLAYER_ACCELERATION * 0.3;
+                    player.velocity.x += randomDir.x * BOT_ACCELERATION * 0.3;
+                    player.velocity.y += randomDir.y * BOT_ACCELERATION * 0.3;
                   }
                 }
               }
@@ -470,7 +472,8 @@ export default function Index() {
         player.velocity.y += velocityDiff.y * easeOut(MOVEMENT_SMOOTHING);
 
         const speed = Math.sqrt(player.velocity.x ** 2 + player.velocity.y ** 2);
-        const maxSpeed = player.hasAura ? PLAYER_MAX_SPEED * 1.2 : PLAYER_MAX_SPEED;
+        const baseMaxSpeed = player.isPlayer ? PLAYER_MAX_SPEED : BOT_MAX_SPEED;
+        const maxSpeed = player.hasAura ? baseMaxSpeed * 1.2 : baseMaxSpeed;
         if (speed > maxSpeed) {
           player.velocity.x = (player.velocity.x / speed) * maxSpeed;
           player.velocity.y = (player.velocity.y / speed) * maxSpeed;
@@ -851,7 +854,46 @@ export default function Index() {
         const baseColor = player.team === 'purple' ? '#9b87f5' : '#0EA5E9';
         const darkColor = player.team === 'purple' ? '#7c3aed' : '#0369a1';
         
-        ctx.shadowBlur = player.hasAura ? 25 : 15;
+        const lightSources = [
+          { x: CANVAS_WIDTH * 0.3, y: CANVAS_HEIGHT * 0.3 },
+          { x: CANVAS_WIDTH * 0.7, y: CANVAS_HEIGHT * 0.7 },
+        ];
+        
+        let totalLightX = 0;
+        let totalLightY = 0;
+        let totalLightIntensity = 0;
+        
+        for (const light of lightSources) {
+          const dx = light.x - player.position.x;
+          const dy = light.y - player.position.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          const intensity = 1 / (1 + dist / 500);
+          
+          totalLightX += (dx / dist) * intensity;
+          totalLightY += (dy / dist) * intensity;
+          totalLightIntensity += intensity;
+        }
+        
+        totalLightX /= totalLightIntensity;
+        totalLightY /= totalLightIntensity;
+        
+        const shadowOffsetX = -totalLightX * 8;
+        const shadowOffsetY = -totalLightY * 8;
+        
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
+        ctx.beginPath();
+        ctx.ellipse(
+          shadowOffsetX * 1.5,
+          shadowOffsetY * 1.5 + player.radius * 0.3,
+          player.radius * 0.9,
+          player.radius * 0.3,
+          0,
+          0,
+          Math.PI * 2
+        );
+        ctx.fill();
+        
+        ctx.shadowBlur = player.hasAura ? 25 : 0;
         ctx.shadowColor = player.hasAura ? '#8B0000' : baseColor;
         ctx.fillStyle = baseColor;
         ctx.beginPath();
@@ -864,17 +906,22 @@ export default function Index() {
         ctx.arc(0, 0, player.radius, 0, Math.PI * 2);
         ctx.clip();
         
+        const lightAngle = Math.atan2(totalLightY, totalLightX);
+        const lightHighlightX = Math.cos(lightAngle) * player.radius * 0.4;
+        const lightHighlightY = Math.sin(lightAngle) * player.radius * 0.4;
+        
         const sphereGradient = ctx.createRadialGradient(
-          -player.radius * 0.3,
-          -player.radius * 0.3,
+          lightHighlightX,
+          lightHighlightY,
           0,
           0,
           0,
-          player.radius * 1.4
+          player.radius * 1.6
         );
-        sphereGradient.addColorStop(0, 'rgba(255, 255, 255, 0.15)');
-        sphereGradient.addColorStop(0.5, 'rgba(255, 255, 255, 0)');
-        sphereGradient.addColorStop(1, 'rgba(0, 0, 0, 0.2)');
+        sphereGradient.addColorStop(0, 'rgba(255, 255, 255, 0.4)');
+        sphereGradient.addColorStop(0.3, 'rgba(255, 255, 255, 0.1)');
+        sphereGradient.addColorStop(0.7, 'rgba(0, 0, 0, 0)');
+        sphereGradient.addColorStop(1, 'rgba(0, 0, 0, 0.3)');
         ctx.fillStyle = sphereGradient;
         ctx.fillRect(-player.radius, -player.radius, player.radius * 2, player.radius * 2);
         
