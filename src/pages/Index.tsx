@@ -34,6 +34,7 @@ type Player = {
   movementPhase: number;
   patternOffset: Vector2D;
   lastAimAngle: number;
+  smoothLightDir: Vector2D;
 };
 
 type Ball = {
@@ -67,7 +68,7 @@ const BALL_RADIUS = 8;
 const PLAYER_MAX_SPEED = 6;
 const BOT_MAX_SPEED = 6;
 const PLAYER_ACCELERATION = 0.35;
-const BOT_ACCELERATION = 0.35;
+const BOT_ACCELERATION = 0.5;
 const FRICTION = 0.9;
 const MOVEMENT_SMOOTHING = 0.25;
 const BALL_FRICTION = 0.985;
@@ -213,6 +214,7 @@ export default function Index() {
           movementPhase: 0,
           patternOffset: { x: 0, y: 0 },
           lastAimAngle: 0,
+          smoothLightDir: { x: 0, y: 1 },
         };
         newPlayers.push(player);
         
@@ -877,8 +879,12 @@ export default function Index() {
         totalLightX /= totalLightIntensity;
         totalLightY /= totalLightIntensity;
         
-        const shadowOffsetX = -totalLightX * 8;
-        const shadowOffsetY = -totalLightY * 8;
+        const lerpFactor = 0.15;
+        player.smoothLightDir.x += (totalLightX - player.smoothLightDir.x) * lerpFactor;
+        player.smoothLightDir.y += (totalLightY - player.smoothLightDir.y) * lerpFactor;
+        
+        const shadowOffsetX = -player.smoothLightDir.x * 8;
+        const shadowOffsetY = -player.smoothLightDir.y * 8;
         
         ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
         ctx.beginPath();
@@ -906,7 +912,7 @@ export default function Index() {
         ctx.arc(0, 0, player.radius, 0, Math.PI * 2);
         ctx.clip();
         
-        const lightAngle = Math.atan2(totalLightY, totalLightX);
+        const lightAngle = Math.atan2(player.smoothLightDir.y, player.smoothLightDir.x);
         const lightHighlightX = Math.cos(lightAngle) * player.radius * 0.4;
         const lightHighlightY = Math.sin(lightAngle) * player.radius * 0.4;
         
