@@ -32,6 +32,8 @@ type Player = {
   avatar: string;
   trail: Array<{ x: number; y: number; alpha: number }>;
   movementPhase: number;
+  patternOffset: Vector2D;
+  lastAimAngle: number;
 };
 
 type Ball = {
@@ -207,6 +209,8 @@ export default function Index() {
           avatar: isPlayerControlled ? (customAvatarUrl || playerAvatar) : BOT_AVATARS[Math.floor(Math.random() * BOT_AVATARS.length)],
           trail: [],
           movementPhase: 0,
+          patternOffset: { x: 0, y: 0 },
+          lastAimAngle: 0,
         };
         newPlayers.push(player);
         
@@ -477,6 +481,9 @@ export default function Index() {
 
         player.position.x += player.velocity.x;
         player.position.y += player.velocity.y;
+        
+        player.patternOffset.x -= player.velocity.x * 0.5;
+        player.patternOffset.y -= player.velocity.y * 0.5;
 
         if (speed > 1) {
           player.trail.push({ x: player.position.x, y: player.position.y, alpha: 1 });
@@ -841,42 +848,44 @@ export default function Index() {
         ctx.scale(player.scale, player.scale);
         ctx.rotate(player.rotation);
 
-        const sphereGradient = ctx.createRadialGradient(
-          -player.radius * 0.3,
-          -player.radius * 0.3,
-          0,
-          0,
-          0,
-          player.radius
-        );
         const baseColor = player.team === 'purple' ? '#9b87f5' : '#0EA5E9';
-        const lightColor = player.team === 'purple' ? '#c4b5fd' : '#38bdf8';
         const darkColor = player.team === 'purple' ? '#7c3aed' : '#0369a1';
-        
-        sphereGradient.addColorStop(0, lightColor);
-        sphereGradient.addColorStop(0.4, baseColor);
-        sphereGradient.addColorStop(1, darkColor);
         
         ctx.shadowBlur = player.hasAura ? 25 : 15;
         ctx.shadowColor = player.hasAura ? '#8B0000' : baseColor;
-        ctx.fillStyle = sphereGradient;
+        ctx.fillStyle = baseColor;
         ctx.beginPath();
         ctx.arc(0, 0, player.radius, 0, Math.PI * 2);
         ctx.fill();
-        
         ctx.shadowBlur = 0;
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+        
+        ctx.save();
         ctx.beginPath();
-        ctx.ellipse(
-          -player.radius * 0.25,
-          -player.radius * 0.35,
-          player.radius * 0.35,
-          player.radius * 0.2,
-          -0.3,
-          0,
-          Math.PI * 2
-        );
-        ctx.fill();
+        ctx.arc(0, 0, player.radius, 0, Math.PI * 2);
+        ctx.clip();
+        
+        ctx.translate(player.patternOffset.x % 40 - 40, player.patternOffset.y % 40 - 40);
+        
+        ctx.fillStyle = darkColor;
+        for (let i = 0; i < 4; i++) {
+          for (let j = 0; j < 4; j++) {
+            const px = i * 40 + Math.sin(i * 2.5 + j) * 15;
+            const py = j * 40 + Math.cos(j * 1.8 + i) * 15;
+            const size = 8 + Math.sin(i + j) * 5;
+            
+            ctx.beginPath();
+            ctx.arc(px, py, size, 0, Math.PI * 2);
+            ctx.fill();
+            
+            if (Math.random() > 0.6) {
+              ctx.beginPath();
+              ctx.arc(px + 15, py + 10, size * 0.5, 0, Math.PI * 2);
+              ctx.fill();
+            }
+          }
+        }
+        
+        ctx.restore();
         ctx.globalAlpha = 1;
 
         if (player.isPlayer) {
@@ -885,36 +894,44 @@ export default function Index() {
           ctx.beginPath();
           ctx.arc(0, 0, player.radius + 5, 0, Math.PI * 2);
           ctx.stroke();
-          
-          const aimDistance = 35;
+        }
+        
+        ctx.restore();
+        
+        if (player.isPlayer) {
           const dx = mousePosition.x - player.position.x;
           const dy = mousePosition.y - player.position.y;
           const dist = Math.sqrt(dx * dx + dy * dy);
           
           if (dist > 5) {
-            const dirX = dx / dist;
-            const dirY = dy / dist;
-            const aimX = dirX * aimDistance;
-            const aimY = dirY * aimDistance;
-            
-            ctx.globalAlpha = 0.4;
-            ctx.fillStyle = '#FFFFFF';
-            ctx.beginPath();
-            ctx.arc(aimX, aimY, 4, 0, Math.PI * 2);
-            ctx.fill();
-            
-            ctx.globalAlpha = 0.2;
-            ctx.strokeStyle = '#FFFFFF';
-            ctx.lineWidth = 1.5;
-            ctx.setLineDash([3, 3]);
-            ctx.beginPath();
-            ctx.moveTo(0, 0);
-            ctx.lineTo(aimX, aimY);
-            ctx.stroke();
-            ctx.setLineDash([]);
-            ctx.globalAlpha = 1;
+            player.lastAimAngle = Math.atan2(dy, dx);
           }
+          
+          ctx.save();
+          ctx.translate(player.position.x, player.position.y);
+          ctx.rotate(player.lastAimAngle);
+          
+          const arcRadius = player.radius + 12;
+          const arcLength = Math.PI * 0.25;
+          
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+          ctx.lineWidth = 2.5;
+          ctx.beginPath();
+          ctx.arc(0, 0, arcRadius, -arcLength / 2, arcLength / 2);
+          ctx.stroke();
+          
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+          ctx.beginPath();
+          ctx.arc(arcRadius, 0, 3, 0, Math.PI * 2);
+          ctx.fill();
+          
+          ctx.restore();
         }
+        
+        ctx.save();
+        ctx.translate(player.position.x, player.position.y);
+        ctx.scale(player.scale, player.scale);
+        ctx.rotate(player.rotation);
 
         if (player.hasBall) {
           ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
