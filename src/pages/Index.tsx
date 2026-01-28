@@ -62,10 +62,10 @@ const CANVAS_WIDTH = window.innerWidth;
 const CANVAS_HEIGHT = window.innerHeight;
 const PLAYER_RADIUS = 20;
 const BALL_RADIUS = 8;
-const PLAYER_MAX_SPEED = 5;
-const PLAYER_ACCELERATION = 0.4;
-const FRICTION = 0.88;
-const MOVEMENT_SMOOTHING = 0.15;
+const PLAYER_MAX_SPEED = 6;
+const PLAYER_ACCELERATION = 0.35;
+const FRICTION = 0.9;
+const MOVEMENT_SMOOTHING = 0.25;
 const BALL_FRICTION = 0.985;
 const BALL_BOUNCE = 0.7;
 const THROW_FORCE = 18;
@@ -455,19 +455,15 @@ export default function Index() {
           }
         }
 
-        const easeOut = (t: number) => 1 - Math.pow(1 - t, 3);
-        const easeIn = (t: number) => t * t * t;
+        const easeOut = (t: number) => 1 - Math.pow(1 - t, 2);
         
         const velocityDiff = {
           x: player.targetVelocity.x - player.velocity.x,
           y: player.targetVelocity.y - player.velocity.y
         };
         
-        const isAccelerating = Math.sqrt(velocityDiff.x ** 2 + velocityDiff.y ** 2) > 0.1;
-        const easingFactor = isAccelerating ? easeIn(MOVEMENT_SMOOTHING) : easeOut(MOVEMENT_SMOOTHING);
-        
-        player.velocity.x += velocityDiff.x * easingFactor;
-        player.velocity.y += velocityDiff.y * easingFactor;
+        player.velocity.x += velocityDiff.x * easeOut(MOVEMENT_SMOOTHING);
+        player.velocity.y += velocityDiff.y * easeOut(MOVEMENT_SMOOTHING);
 
         const speed = Math.sqrt(player.velocity.x ** 2 + player.velocity.y ** 2);
         const maxSpeed = player.hasAura ? PLAYER_MAX_SPEED * 1.2 : PLAYER_MAX_SPEED;
@@ -500,12 +496,12 @@ export default function Index() {
         }
         
         if (speed > 0.5) {
-          player.movementPhase += speed * 0.1;
-          const bounce = Math.sin(player.movementPhase) * 0.03;
+          player.movementPhase += speed * 0.15;
+          const bounce = Math.sin(player.movementPhase) * 0.02;
           player.scale = 1 + bounce;
         } else {
           if (player.scale > 1) {
-            player.scale -= 0.02;
+            player.scale -= 0.03;
             if (player.scale < 1) player.scale = 1;
           }
         }
