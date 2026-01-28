@@ -482,8 +482,8 @@ export default function Index() {
         player.position.x += player.velocity.x;
         player.position.y += player.velocity.y;
         
-        player.patternOffset.x -= player.velocity.x * 0.5;
-        player.patternOffset.y -= player.velocity.y * 0.5;
+        player.patternOffset.x += player.velocity.x * 0.8;
+        player.patternOffset.y += player.velocity.y * 0.8;
 
         if (speed > 1) {
           player.trail.push({ x: player.position.x, y: player.position.y, alpha: 1 });
@@ -864,26 +864,65 @@ export default function Index() {
         ctx.arc(0, 0, player.radius, 0, Math.PI * 2);
         ctx.clip();
         
-        ctx.translate(player.patternOffset.x % 40 - 40, player.patternOffset.y % 40 - 40);
+        const sphereGradient = ctx.createRadialGradient(
+          -player.radius * 0.3,
+          -player.radius * 0.3,
+          0,
+          0,
+          0,
+          player.radius * 1.4
+        );
+        sphereGradient.addColorStop(0, 'rgba(255, 255, 255, 0.15)');
+        sphereGradient.addColorStop(0.5, 'rgba(255, 255, 255, 0)');
+        sphereGradient.addColorStop(1, 'rgba(0, 0, 0, 0.2)');
+        ctx.fillStyle = sphereGradient;
+        ctx.fillRect(-player.radius, -player.radius, player.radius * 2, player.radius * 2);
+        
+        const patternSize = 50;
+        const offsetX = player.patternOffset.x % patternSize;
+        const offsetY = player.patternOffset.y % patternSize;
         
         ctx.fillStyle = darkColor;
-        for (let i = 0; i < 4; i++) {
-          for (let j = 0; j < 4; j++) {
-            const px = i * 40 + Math.sin(i * 2.5 + j) * 15;
-            const py = j * 40 + Math.cos(j * 1.8 + i) * 15;
-            const size = 8 + Math.sin(i + j) * 5;
+        for (let i = -2; i < 3; i++) {
+          for (let j = -2; j < 3; j++) {
+            const baseX = i * patternSize + offsetX;
+            const baseY = j * patternSize + offsetY;
             
-            ctx.beginPath();
-            ctx.arc(px, py, size, 0, Math.PI * 2);
-            ctx.fill();
+            const seed = i * 7 + j * 13;
+            const size = 6 + (Math.sin(seed * 1.3) + 1) * 4;
+            const offsetAngle = seed * 2.1;
+            const offsetDist = (Math.sin(seed * 0.7) + 1) * 8;
             
-            if (Math.random() > 0.6) {
+            const px = baseX + Math.cos(offsetAngle) * offsetDist;
+            const py = baseY + Math.sin(offsetAngle) * offsetDist;
+            
+            const distFromCenter = Math.sqrt(px * px + py * py);
+            const edgeFade = Math.max(0, 1 - (distFromCenter / player.radius) * 1.2);
+            
+            if (edgeFade > 0) {
+              ctx.globalAlpha = edgeFade * 0.8;
               ctx.beginPath();
-              ctx.arc(px + 15, py + 10, size * 0.5, 0, Math.PI * 2);
+              ctx.arc(px, py, size, 0, Math.PI * 2);
               ctx.fill();
+              
+              if (Math.sin(seed * 3.2) > 0.5) {
+                const smallSize = size * 0.4;
+                const smallX = px + Math.cos(seed) * 10;
+                const smallY = py + Math.sin(seed) * 10;
+                const smallDist = Math.sqrt(smallX * smallX + smallY * smallY);
+                const smallFade = Math.max(0, 1 - (smallDist / player.radius) * 1.2);
+                
+                if (smallFade > 0) {
+                  ctx.globalAlpha = smallFade * 0.6;
+                  ctx.beginPath();
+                  ctx.arc(smallX, smallY, smallSize, 0, Math.PI * 2);
+                  ctx.fill();
+                }
+              }
             }
           }
         }
+        ctx.globalAlpha = 1;
         
         ctx.restore();
         ctx.globalAlpha = 1;
@@ -904,7 +943,13 @@ export default function Index() {
           const dist = Math.sqrt(dx * dx + dy * dy);
           
           if (dist > 5) {
-            player.lastAimAngle = Math.atan2(dy, dx);
+            const targetAngle = Math.atan2(dy, dx);
+            let angleDiff = targetAngle - player.lastAimAngle;
+            
+            while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+            while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+            
+            player.lastAimAngle += angleDiff * 0.2;
           }
           
           ctx.save();
