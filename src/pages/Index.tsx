@@ -841,13 +841,42 @@ export default function Index() {
         ctx.scale(player.scale, player.scale);
         ctx.rotate(player.rotation);
 
+        const sphereGradient = ctx.createRadialGradient(
+          -player.radius * 0.3,
+          -player.radius * 0.3,
+          0,
+          0,
+          0,
+          player.radius
+        );
+        const baseColor = player.team === 'purple' ? '#9b87f5' : '#0EA5E9';
+        const lightColor = player.team === 'purple' ? '#c4b5fd' : '#38bdf8';
+        const darkColor = player.team === 'purple' ? '#7c3aed' : '#0369a1';
+        
+        sphereGradient.addColorStop(0, lightColor);
+        sphereGradient.addColorStop(0.4, baseColor);
+        sphereGradient.addColorStop(1, darkColor);
+        
         ctx.shadowBlur = player.hasAura ? 25 : 15;
-        ctx.shadowColor = player.hasAura ? '#8B0000' : (player.team === 'purple' ? '#9b87f5' : '#0EA5E9');
-        ctx.fillStyle = player.team === 'purple' ? '#9b87f5' : '#0EA5E9';
+        ctx.shadowColor = player.hasAura ? '#8B0000' : baseColor;
+        ctx.fillStyle = sphereGradient;
         ctx.beginPath();
         ctx.arc(0, 0, player.radius, 0, Math.PI * 2);
         ctx.fill();
+        
         ctx.shadowBlur = 0;
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+        ctx.beginPath();
+        ctx.ellipse(
+          -player.radius * 0.25,
+          -player.radius * 0.35,
+          player.radius * 0.35,
+          player.radius * 0.2,
+          -0.3,
+          0,
+          Math.PI * 2
+        );
+        ctx.fill();
         ctx.globalAlpha = 1;
 
         if (player.isPlayer) {
@@ -856,6 +885,35 @@ export default function Index() {
           ctx.beginPath();
           ctx.arc(0, 0, player.radius + 5, 0, Math.PI * 2);
           ctx.stroke();
+          
+          const aimDistance = 35;
+          const dx = mousePosition.x - player.position.x;
+          const dy = mousePosition.y - player.position.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          
+          if (dist > 5) {
+            const dirX = dx / dist;
+            const dirY = dy / dist;
+            const aimX = dirX * aimDistance;
+            const aimY = dirY * aimDistance;
+            
+            ctx.globalAlpha = 0.4;
+            ctx.fillStyle = '#FFFFFF';
+            ctx.beginPath();
+            ctx.arc(aimX, aimY, 4, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.globalAlpha = 0.2;
+            ctx.strokeStyle = '#FFFFFF';
+            ctx.lineWidth = 1.5;
+            ctx.setLineDash([3, 3]);
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(aimX, aimY);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            ctx.globalAlpha = 1;
+          }
         }
 
         if (player.hasBall) {
