@@ -68,7 +68,7 @@ const BALL_RADIUS = 8;
 const PLAYER_MAX_SPEED = 6;
 const BOT_MAX_SPEED = 6;
 const PLAYER_ACCELERATION = 0.35;
-const BOT_ACCELERATION = 0.5;
+const BOT_ACCELERATION = 0.45;
 const FRICTION = 0.9;
 const MOVEMENT_SMOOTHING = 0.25;
 const BALL_FRICTION = 0.985;
@@ -334,7 +334,7 @@ export default function Index() {
             player.hasBall = false;
             player.respawnTime = undefined;
             player.deathAnimation = undefined;
-            player.scale = 0.5;
+            player.scale = 1;
             player.position = {
               x: player.team === 'purple' ? CANVAS_WIDTH * 0.25 : CANVAS_WIDTH * 0.75,
               y: CANVAS_HEIGHT * 0.5,
@@ -384,8 +384,8 @@ export default function Index() {
               const perpDir = { x: -awayDir.y, y: awayDir.x };
               const dodgeChoice = Math.random() > 0.5 ? 1 : -1;
               
-              player.velocity.x += (awayDir.x * 0.7 + perpDir.x * dodgeChoice * 0.3) * BOT_ACCELERATION * 2.2;
-              player.velocity.y += (awayDir.y * 0.7 + perpDir.y * dodgeChoice * 0.3) * BOT_ACCELERATION * 2.2;
+              player.velocity.x += (awayDir.x * 0.7 + perpDir.x * dodgeChoice * 0.3) * BOT_ACCELERATION * 3.5;
+              player.velocity.y += (awayDir.y * 0.7 + perpDir.y * dodgeChoice * 0.3) * BOT_ACCELERATION * 3.5;
               player.aiTimer = 0;
             } else if (!player.hasBall) {
               const freeBalls = balls.filter(b => !b.owner && !b.justThrown);
@@ -398,8 +398,8 @@ export default function Index() {
                   x: nearest.position.x - player.position.x,
                   y: nearest.position.y - player.position.y,
                 });
-                player.velocity.x += dir.x * BOT_ACCELERATION * 1.2;
-                player.velocity.y += dir.y * BOT_ACCELERATION * 1.2;
+                player.velocity.x += dir.x * BOT_ACCELERATION * 2.0;
+                player.velocity.y += dir.y * BOT_ACCELERATION * 2.0;
               } else {
                 player.aiState = 'idle';
                 if (Math.random() < 0.015) {
@@ -407,8 +407,8 @@ export default function Index() {
                     x: (Math.random() - 0.5) * 2,
                     y: (Math.random() - 0.5) * 2,
                   };
-                  player.velocity.x += randomDir.x * BOT_ACCELERATION * 0.4;
-                  player.velocity.y += randomDir.y * BOT_ACCELERATION * 0.4;
+                  player.velocity.x += randomDir.x * BOT_ACCELERATION * 0.6;
+                  player.velocity.y += randomDir.y * BOT_ACCELERATION * 0.6;
                 }
               }
             } else if (player.hasBall && enemies.length > 0) {
@@ -438,22 +438,22 @@ export default function Index() {
                       x: closestEnemy.position.x - player.position.x,
                       y: closestEnemy.position.y - player.position.y,
                     });
-                    player.velocity.x += dir.x * BOT_ACCELERATION * 0.5;
-                    player.velocity.y += dir.y * BOT_ACCELERATION * 0.5;
+                    player.velocity.x += dir.x * BOT_ACCELERATION * 0.8;
+                    player.velocity.y += dir.y * BOT_ACCELERATION * 0.8;
                   } else if (moveChoice < 0.6) {
                     const awayDir = {
                       x: player.team === 'purple' ? -1 : 1,
                       y: (Math.random() - 0.5) * 2,
                     };
-                    player.velocity.x += awayDir.x * BOT_ACCELERATION * 0.3;
-                    player.velocity.y += awayDir.y * BOT_ACCELERATION * 0.3;
+                    player.velocity.x += awayDir.x * BOT_ACCELERATION * 0.5;
+                    player.velocity.y += awayDir.y * BOT_ACCELERATION * 0.5;
                   } else {
                     const randomDir = {
                       x: (Math.random() - 0.5) * 2,
                       y: (Math.random() - 0.5) * 2,
                     };
-                    player.velocity.x += randomDir.x * BOT_ACCELERATION * 0.3;
-                    player.velocity.y += randomDir.y * BOT_ACCELERATION * 0.3;
+                    player.velocity.x += randomDir.x * BOT_ACCELERATION * 0.5;
+                    player.velocity.y += randomDir.y * BOT_ACCELERATION * 0.5;
                   }
                 }
               }
