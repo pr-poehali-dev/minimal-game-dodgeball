@@ -68,7 +68,7 @@ const BALL_RADIUS = 8;
 const PLAYER_MAX_SPEED = 6;
 const BOT_MAX_SPEED = 6;
 const PLAYER_ACCELERATION = 0.35;
-const BOT_ACCELERATION = 0.45;
+const BOT_BASE_ACCELERATION = 0.45;
 const FRICTION = 0.9;
 const MOVEMENT_SMOOTHING = 0.25;
 const BALL_FRICTION = 0.985;
@@ -127,6 +127,16 @@ export default function Index() {
   const particlesRef = useRef<Particle[]>([]);
   const animationFrameRef = useRef<number>();
   const gameStartTimeRef = useRef<number>(0);
+  
+  const playerStatsRef = useRef({
+    successfulHits: 0,
+    missedThrows: 0,
+    dodgedBalls: 0,
+    deaths: 0,
+    timeAlive: 0,
+    lastSkillUpdate: Date.now(),
+    skillLevel: 1.0
+  });
   const [countdown, setCountdown] = useState<number | null>(null);
   const avatarImagesRef = useRef<Map<string, HTMLImageElement>>(new Map());
 
@@ -239,6 +249,17 @@ export default function Index() {
     ballsRef.current = newBalls;
     particlesRef.current = [];
     gameStartTimeRef.current = Date.now();
+    
+    playerStatsRef.current = {
+      successfulHits: 0,
+      missedThrows: 0,
+      dodgedBalls: 0,
+      deaths: 0,
+      timeAlive: 0,
+      lastSkillUpdate: Date.now(),
+      skillLevel: 1.0
+    };
+    
     setInfiniteMode(infinite);
     setScore({ purple: size, blue: size });
     setCountdown(null);
@@ -263,6 +284,27 @@ export default function Index() {
     }
   };
 
+  const updateBotDifficulty = () => {
+    const stats = playerStatsRef.current;
+    const now = Date.now();
+    
+    if (now - stats.lastSkillUpdate < 5000) return;
+    
+    stats.lastSkillUpdate = now;
+    
+    const hitAccuracy = stats.successfulHits / Math.max(1, stats.successfulHits + stats.missedThrows);
+    const survivalRate = stats.timeAlive / Math.max(1, stats.timeAlive + stats.deaths * 3000);
+    const dodgeRate = stats.dodgedBalls / Math.max(1, stats.dodgedBalls + stats.deaths);
+    
+    const performanceScore = (hitAccuracy * 0.4 + survivalRate * 0.3 + dodgeRate * 0.3);
+    
+    if (performanceScore > 0.7) {
+      stats.skillLevel = Math.min(1.5, stats.skillLevel + 0.05);
+    } else if (performanceScore < 0.3) {
+      stats.skillLevel = Math.max(0.6, stats.skillLevel - 0.05);
+    }
+  };
+
   useEffect(() => {
     if (gameState !== 'playing') return;
 
@@ -275,8 +317,16 @@ export default function Index() {
     const gameLoop = () => {
       const players = playersRef.current;
       const balls = ballsRef.current;
+      
+      updateBotDifficulty();
+      const BOT_ACCELERATION = BOT_BASE_ACCELERATION * playerStatsRef.current.skillLevel;
 
       const currentTime = Date.now();
+      
+      const playerEntity = players.find(p => p.isPlayer);
+      if (playerEntity?.isAlive) {
+        playerStatsRef.current.timeAlive += 16;
+      }
       const gameStarted = currentTime - gameStartTimeRef.current;
       
       if (gameStarted < 3000) {
@@ -582,24 +632,48 @@ export default function Index() {
           if (ball.position.x - ball.radius < 0) {
             ball.position.x = ball.radius;
             ball.velocity.x *= -BALL_BOUNCE;
+            if (ball.justThrown) {
+              const thrower = players.find(p => p.id === ball.thrownBy);
+              if (thrower && !thrower.isPlayer) {
+                playerStatsRef.current.dodgedBalls++;
+              }
+            }
             ball.justThrown = false;
             createParticles(ball.position.x, ball.position.y, '#FFFFFF', 8);
           }
           if (ball.position.x + ball.radius > CANVAS_WIDTH) {
             ball.position.x = CANVAS_WIDTH - ball.radius;
             ball.velocity.x *= -BALL_BOUNCE;
+            if (ball.justThrown) {
+              const thrower = players.find(p => p.id === ball.thrownBy);
+              if (thrower && !thrower.isPlayer) {
+                playerStatsRef.current.dodgedBalls++;
+              }
+            }
             ball.justThrown = false;
             createParticles(ball.position.x, ball.position.y, '#FFFFFF', 8);
           }
           if (ball.position.y - ball.radius < 0) {
             ball.position.y = ball.radius;
             ball.velocity.y *= -BALL_BOUNCE;
+            if (ball.justThrown) {
+              const thrower = players.find(p => p.id === ball.thrownBy);
+              if (thrower && !thrower.isPlayer) {
+                playerStatsRef.current.dodgedBalls++;
+              }
+            }
             ball.justThrown = false;
             createParticles(ball.position.x, ball.position.y, '#FFFFFF', 8);
           }
           if (ball.position.y + ball.radius > CANVAS_HEIGHT) {
             ball.position.y = CANVAS_HEIGHT - ball.radius;
             ball.velocity.y *= -BALL_BOUNCE;
+            if (ball.justThrown) {
+              const thrower = players.find(p => p.id === ball.thrownBy);
+              if (thrower && !thrower.isPlayer) {
+                playerStatsRef.current.dodgedBalls++;
+              }
+            }
             ball.justThrown = false;
             createParticles(ball.position.x, ball.position.y, '#FFFFFF', 8);
           }
@@ -607,6 +681,12 @@ export default function Index() {
           const speed = Math.sqrt(ball.velocity.x ** 2 + ball.velocity.y ** 2);
           if (speed < 0.5) {
             ball.velocity = { x: 0, y: 0 };
+            if (ball.justThrown) {
+              const thrower = players.find(p => p.id === ball.thrownBy);
+              if (thrower?.isPlayer) {
+                playerStatsRef.current.missedThrows++;
+              }
+            }
             ball.justThrown = false;
           }
 
@@ -624,6 +704,9 @@ export default function Index() {
               if (thrower && thrower.team !== player.team && dist < ball.radius + player.radius && !isInvulnerable) {
                 if (player.isPlayer) {
                   console.log('💀 Player hit! invulnerableUntil:', player.invulnerableUntil, 'currentTime:', Date.now());
+                  playerStatsRef.current.deaths++;
+                } else if (thrower.isPlayer) {
+                  playerStatsRef.current.successfulHits++;
                 }
                 player.isAlive = false;
                 player.hitTime = Date.now();
