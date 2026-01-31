@@ -680,10 +680,17 @@ export default function Index() {
 
             const dist = distance(ball.position, player.position);
             
-            if (ball.justThrown && ball.thrownBy !== player.id) {
+            if (ball.justThrown && ball.thrownBy !== player.id && dist < ball.radius + player.radius) {
               const thrower = players.find(p => p.id === ball.thrownBy);
               const isInvulnerable = player.invulnerableUntil && Date.now() < player.invulnerableUntil;
-              if (thrower && thrower.team !== player.team && dist < ball.radius + player.radius && !isInvulnerable) {
+              
+              const dx = ball.position.x - player.position.x;
+              const dy = ball.position.y - player.position.y;
+              const collisionDist = Math.sqrt(dx * dx + dy * dy);
+              const nx = dx / collisionDist;
+              const ny = dy / collisionDist;
+              
+              if (thrower && thrower.team !== player.team && !isInvulnerable) {
                 if (player.isPlayer) {
                   playerStatsRef.current.deaths++;
                 } else if (thrower.isPlayer) {
@@ -700,28 +707,28 @@ export default function Index() {
                 const hitColor = player.team === 'purple' ? '#9b87f5' : '#0EA5E9';
                 createParticles(player.position.x, player.position.y, hitColor, 20);
                 createParticles(ball.position.x, ball.position.y, '#FF6B6B', 10);
+              } else if (thrower && thrower.team === player.team) {
+                const pushForce = Math.sqrt(ball.velocity.x ** 2 + ball.velocity.y ** 2) * 0.3;
+                player.velocity.x += nx * pushForce;
+                player.velocity.y += ny * pushForce;
                 
-                const dx = ball.position.x - player.position.x;
-                const dy = ball.position.y - player.position.y;
-                const collisionDist = Math.sqrt(dx * dx + dy * dy);
-                const nx = dx / collisionDist;
-                const ny = dy / collisionDist;
-                
-                const relativeVelocity = {
-                  x: ball.velocity.x - player.velocity.x,
-                  y: ball.velocity.y - player.velocity.y,
-                };
-                
-                const velocityAlongNormal = relativeVelocity.x * nx + relativeVelocity.y * ny;
-                
-                ball.velocity.x = ball.velocity.x - 2 * velocityAlongNormal * nx;
-                ball.velocity.y = ball.velocity.y - 2 * velocityAlongNormal * ny;
-                ball.velocity.x *= BALL_BOUNCE;
-                ball.velocity.y *= BALL_BOUNCE;
-                
-                ball.justThrown = false;
-                ball.thrownBy = undefined;
+                createParticles(ball.position.x, ball.position.y, player.team === 'purple' ? '#9b87f5' : '#0EA5E9', 5);
               }
+              
+              const relativeVelocity = {
+                x: ball.velocity.x - player.velocity.x,
+                y: ball.velocity.y - player.velocity.y,
+              };
+              
+              const velocityAlongNormal = relativeVelocity.x * nx + relativeVelocity.y * ny;
+              
+              ball.velocity.x = ball.velocity.x - 2 * velocityAlongNormal * nx;
+              ball.velocity.y = ball.velocity.y - 2 * velocityAlongNormal * ny;
+              ball.velocity.x *= BALL_BOUNCE;
+              ball.velocity.y *= BALL_BOUNCE;
+              
+              ball.justThrown = false;
+              ball.thrownBy = undefined;
             } else if (!ball.justThrown && !ball.owner && !player.hasBall && dist < BALL_PICKUP_RADIUS) {
               ball.owner = player.id;
               player.hasBall = true;
