@@ -434,8 +434,8 @@ export default function Index() {
               const perpDir = { x: -awayDir.y, y: awayDir.x };
               const dodgeChoice = Math.random() > 0.5 ? 1 : -1;
               
-              player.velocity.x += (awayDir.x * 0.7 + perpDir.x * dodgeChoice * 0.3) * BOT_ACCELERATION * 3.5;
-              player.velocity.y += (awayDir.y * 0.7 + perpDir.y * dodgeChoice * 0.3) * BOT_ACCELERATION * 3.5;
+              player.targetVelocity.x = (awayDir.x * 0.7 + perpDir.x * dodgeChoice * 0.3) * BOT_MAX_SPEED;
+              player.targetVelocity.y = (awayDir.y * 0.7 + perpDir.y * dodgeChoice * 0.3) * BOT_MAX_SPEED;
               player.aiTimer = 0;
             } else if (!player.hasBall) {
               const freeBalls = balls.filter(b => !b.owner && !b.justThrown);
@@ -448,17 +448,20 @@ export default function Index() {
                   x: nearest.position.x - player.position.x,
                   y: nearest.position.y - player.position.y,
                 });
-                player.velocity.x += dir.x * BOT_ACCELERATION * 2.0;
-                player.velocity.y += dir.y * BOT_ACCELERATION * 2.0;
+                player.targetVelocity.x = dir.x * BOT_MAX_SPEED;
+                player.targetVelocity.y = dir.y * BOT_MAX_SPEED;
               } else {
                 player.aiState = 'idle';
                 if (Math.random() < 0.015) {
-                  const randomDir = {
+                  const randomDir = normalize({
                     x: (Math.random() - 0.5) * 2,
                     y: (Math.random() - 0.5) * 2,
-                  };
-                  player.velocity.x += randomDir.x * BOT_ACCELERATION * 0.6;
-                  player.velocity.y += randomDir.y * BOT_ACCELERATION * 0.6;
+                  });
+                  player.targetVelocity.x = randomDir.x * BOT_MAX_SPEED * 0.3;
+                  player.targetVelocity.y = randomDir.y * BOT_MAX_SPEED * 0.3;
+                } else {
+                  player.targetVelocity.x = 0;
+                  player.targetVelocity.y = 0;
                 }
               }
             } else if (player.hasBall && enemies.length > 0) {
@@ -488,23 +491,26 @@ export default function Index() {
                       x: closestEnemy.position.x - player.position.x,
                       y: closestEnemy.position.y - player.position.y,
                     });
-                    player.velocity.x += dir.x * BOT_ACCELERATION * 0.8;
-                    player.velocity.y += dir.y * BOT_ACCELERATION * 0.8;
+                    player.targetVelocity.x = dir.x * BOT_MAX_SPEED * 0.4;
+                    player.targetVelocity.y = dir.y * BOT_MAX_SPEED * 0.4;
                   } else if (moveChoice < 0.6) {
-                    const awayDir = {
+                    const awayDir = normalize({
                       x: player.team === 'purple' ? -1 : 1,
                       y: (Math.random() - 0.5) * 2,
-                    };
-                    player.velocity.x += awayDir.x * BOT_ACCELERATION * 0.5;
-                    player.velocity.y += awayDir.y * BOT_ACCELERATION * 0.5;
+                    });
+                    player.targetVelocity.x = awayDir.x * BOT_MAX_SPEED * 0.3;
+                    player.targetVelocity.y = awayDir.y * BOT_MAX_SPEED * 0.3;
                   } else {
-                    const randomDir = {
+                    const randomDir = normalize({
                       x: (Math.random() - 0.5) * 2,
                       y: (Math.random() - 0.5) * 2,
-                    };
-                    player.velocity.x += randomDir.x * BOT_ACCELERATION * 0.5;
-                    player.velocity.y += randomDir.y * BOT_ACCELERATION * 0.5;
+                    });
+                    player.targetVelocity.x = randomDir.x * BOT_MAX_SPEED * 0.3;
+                    player.targetVelocity.y = randomDir.y * BOT_MAX_SPEED * 0.3;
                   }
+                } else {
+                  player.targetVelocity.x = 0;
+                  player.targetVelocity.y = 0;
                 }
               }
             } else {
