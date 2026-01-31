@@ -219,7 +219,7 @@ export default function Index() {
           auraPhase: 0,
           invulnerableUntil: undefined,
           nickname: isPlayerControlled ? playerNickname : BOT_NAMES[Math.floor(Math.random() * BOT_NAMES.length)],
-          avatar: isPlayerControlled ? (customAvatarUrl || playerAvatar) : BOT_AVATARS[Math.floor(Math.random() * BOT_AVATARS.length)],
+          avatar: isPlayerControlled ? (customAvatarUrl || playerAvatar) : AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)],
           trail: [],
           movementPhase: 0,
           patternOffset: { x: 0, y: 0 },
