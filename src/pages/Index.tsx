@@ -32,7 +32,6 @@ type Player = {
   avatar: string;
   trail: Array<{ x: number; y: number; alpha: number }>;
   movementPhase: number;
-  patternOffset: Vector2D;
   lastAimAngle: number;
   smoothLightDir: Vector2D;
 };
@@ -45,7 +44,6 @@ type Ball = {
   justThrown: boolean;
   thrownBy?: string;
   owner?: string;
-  trail: Array<{ x: number; y: number; alpha: number }>;
 };
 
 type Particle = {
@@ -222,7 +220,6 @@ export default function Index() {
           avatar: isPlayerControlled ? (customAvatarUrl || playerAvatar) : AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)],
           trail: [],
           movementPhase: 0,
-          patternOffset: { x: 0, y: 0 },
           lastAimAngle: 0,
           smoothLightDir: { x: 0, y: 1 },
         };
@@ -239,7 +236,6 @@ export default function Index() {
           radius: BALL_RADIUS,
           justThrown: false,
           owner: player.id,
-          trail: [],
         };
         newBalls.push(ball);
       }
@@ -333,7 +329,6 @@ export default function Index() {
         const player = players.find(p => p.isPlayer);
         if (player && !player.invulnerableUntil) {
           player.invulnerableUntil = gameStartTimeRef.current + 3000;
-          console.log('🛡️ Invulnerability activated until:', new Date(player.invulnerableUntil).toISOString());
         }
       }
 
@@ -542,21 +537,18 @@ export default function Index() {
 
         player.position.x += player.velocity.x;
         player.position.y += player.velocity.y;
-        
-        player.patternOffset.x += player.velocity.x * 0.8;
-        player.patternOffset.y += player.velocity.y * 0.8;
 
-        if (speed > 1) {
+        if (speed > 2) {
           player.trail.push({ x: player.position.x, y: player.position.y, alpha: 1 });
-          if (player.trail.length > 6) {
+          if (player.trail.length > 4) {
             player.trail.shift();
           }
         } else {
-          player.trail = player.trail.filter((_, i) => i > 0);
+          if (player.trail.length > 0) player.trail.shift();
         }
 
         player.trail.forEach((t) => {
-          t.alpha -= 0.12;
+          t.alpha -= 0.2;
         });
 
         if (speed > 0.5) {
@@ -616,19 +608,6 @@ export default function Index() {
             ball.owner = undefined;
           }
         } else {
-          if (ball.justThrown) {
-            ball.trail.push({ x: ball.position.x, y: ball.position.y, alpha: 1 });
-            if (ball.trail.length > 15) {
-              ball.trail.shift();
-            }
-          } else {
-            ball.trail = ball.trail.filter((_, i) => i > 0);
-          }
-
-          ball.trail.forEach((t, i) => {
-            t.alpha -= 0.05;
-          });
-
           ball.velocity.x *= BALL_FRICTION;
           ball.velocity.y *= BALL_FRICTION;
 
@@ -704,12 +683,8 @@ export default function Index() {
             if (ball.justThrown && ball.thrownBy !== player.id) {
               const thrower = players.find(p => p.id === ball.thrownBy);
               const isInvulnerable = player.invulnerableUntil && Date.now() < player.invulnerableUntil;
-              if (player.isPlayer && isInvulnerable) {
-                console.log('🛡️ Player protected by invulnerability');
-              }
               if (thrower && thrower.team !== player.team && dist < ball.radius + player.radius && !isInvulnerable) {
                 if (player.isPlayer) {
-                  console.log('💀 Player hit! invulnerableUntil:', player.invulnerableUntil, 'currentTime:', Date.now());
                   playerStatsRef.current.deaths++;
                 } else if (thrower.isPlayer) {
                   playerStatsRef.current.successfulHits++;
@@ -1020,50 +995,12 @@ export default function Index() {
         ctx.fillStyle = sphereGradient;
         ctx.fillRect(-player.radius, -player.radius, player.radius * 2, player.radius * 2);
         
-        const patternSize = 50;
-        const offsetX = player.patternOffset.x % patternSize;
-        const offsetY = player.patternOffset.y % patternSize;
-        
         ctx.fillStyle = darkColor;
-        for (let i = -2; i < 3; i++) {
-          for (let j = -2; j < 3; j++) {
-            const baseX = i * patternSize + offsetX;
-            const baseY = j * patternSize + offsetY;
-            
-            const seed = i * 7 + j * 13;
-            const size = 6 + (Math.sin(seed * 1.3) + 1) * 4;
-            const offsetAngle = seed * 2.1;
-            const offsetDist = (Math.sin(seed * 0.7) + 1) * 8;
-            
-            const px = baseX + Math.cos(offsetAngle) * offsetDist;
-            const py = baseY + Math.sin(offsetAngle) * offsetDist;
-            
-            const distFromCenter = Math.sqrt(px * px + py * py);
-            const edgeFade = Math.max(0, 1 - (distFromCenter / player.radius) * 1.2);
-            
-            if (edgeFade > 0) {
-              ctx.globalAlpha = edgeFade * 0.8;
-              ctx.beginPath();
-              ctx.arc(px, py, size, 0, Math.PI * 2);
-              ctx.fill();
-              
-              if (Math.sin(seed * 3.2) > 0.5) {
-                const smallSize = size * 0.4;
-                const smallX = px + Math.cos(seed) * 10;
-                const smallY = py + Math.sin(seed) * 10;
-                const smallDist = Math.sqrt(smallX * smallX + smallY * smallY);
-                const smallFade = Math.max(0, 1 - (smallDist / player.radius) * 1.2);
-                
-                if (smallFade > 0) {
-                  ctx.globalAlpha = smallFade * 0.6;
-                  ctx.beginPath();
-                  ctx.arc(smallX, smallY, smallSize, 0, Math.PI * 2);
-                  ctx.fill();
-                }
-              }
-            }
-          }
-        }
+        ctx.globalAlpha = 0.3;
+        ctx.beginPath();
+        ctx.arc(player.radius * 0.3, -player.radius * 0.3, player.radius * 0.4, 0, Math.PI * 2);
+        ctx.arc(-player.radius * 0.2, player.radius * 0.4, player.radius * 0.3, 0, Math.PI * 2);
+        ctx.fill();
         ctx.globalAlpha = 1;
         
         ctx.restore();
@@ -1181,19 +1118,7 @@ export default function Index() {
       balls.forEach((ball) => {
         if (ball.owner) return;
 
-        ball.trail.forEach((t, i) => {
-          const alpha = t.alpha * (i / ball.trail.length);
-          if (alpha > 0) {
-            ctx.globalAlpha = alpha;
-            ctx.fillStyle = '#FF6B6B';
-            ctx.beginPath();
-            ctx.arc(t.x, t.y, ball.radius * 0.7, 0, Math.PI * 2);
-            ctx.fill();
-          }
-        });
-        ctx.globalAlpha = 1;
-
-        ctx.shadowBlur = ball.justThrown ? 15 : 10;
+        ctx.shadowBlur = ball.justThrown ? 15 : 8;
         ctx.shadowColor = ball.justThrown ? '#FF6B6B' : '#FFFFFF';
         ctx.fillStyle = ball.justThrown ? '#FF6B6B' : '#FFFFFF';
         ctx.beginPath();
@@ -1228,7 +1153,6 @@ export default function Index() {
         ball.velocity = { x: dir.x * THROW_FORCE, y: dir.y * THROW_FORCE };
         ball.justThrown = true;
         ball.thrownBy = player.id;
-        ball.trail = [];
         player.hasBall = false;
         player.throwAnimation = 10;
         player.scale = 0.8;
